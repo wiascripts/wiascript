@@ -1148,16 +1148,30 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- 3. Авто-подбор пистолета (Auto Grab Gun)
+-- Улучшенный Авто-подбор пистолета (Auto-Grab Gun)
 task.spawn(function()
     while task.wait(0.1) do
         if AutoGrabGun then
             local gunDrop = workspace:FindFirstChild("GunDrop")
-            if gunDrop and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = gunDrop.CFrame
-                task.wait(1) -- Пауза, чтобы не телепортировало бесконечно
+            local char = LocalPlayer.Character
+            if gunDrop and char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                
+                -- Метод 1: Эмуляция касания (Работает на 90% экзекьюторов)
+                if firetouchinterest then
+                    firetouchinterest(hrp, gunDrop, 0)
+                    task.wait()
+                    firetouchinterest(hrp, gunDrop, 1)
+                end
+                
+                -- Метод 2: Притягиваем пистолет прямо к игроку
+                gunDrop.CFrame = hrp.CFrame
+                
+                -- Метод 3: Телепорт персонажа точно на пистолет
+                hrp.CFrame = gunDrop.CFrame * CFrame.new(0, 0.5, 0)
+                
+                task.wait(0.3) -- Небольшая пауза, чтобы сервер успел выдать пистолет
             end
         end
     end
 end)
----------------------------------------------------------
