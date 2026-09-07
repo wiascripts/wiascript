@@ -1,6 +1,7 @@
 -- ================================================================= --
 -- WIA HUB v8.0 Ultimate Edition :: whitewia / tordark
 -- FULL GUI + AIMBOT (WITH VISUAL FOV) + PLAYER LIST + EXTENDED ESP + CFRAME SPEED
+-- FIXED: BHOP + TELEPORT TOOL ADDED
 -- ================================================================= --
 
 local Players = game:GetService("Players")
@@ -30,7 +31,8 @@ local infiniteJumpEnabled, bhopEnabled, spinbotEnabled = false, false, false
 local spinbotSpeed = 20
 
 local godmodeEnabled, godmodeConnection, godmodeHealthConnection = false, false, false
-local tpTool, tpEnabled = nil, false
+local tpTool = nil
+local tpEnabled = false
 
 local wallhackEnabled, highlightConnections, whHighlights = false, {}, {}
 local antiAFKEnabled, antiAFKConnection = false, nil
@@ -360,6 +362,55 @@ local function createButton(labelText, callback)
     return btn
 end
 
+-- ========== TELEPORT TOOL FUNCTIONS ==========
+local function createTPTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "WIA_TP"
+    tool.RequiresHandle = false
+    tool.CanBeDropped = false
+
+    local function teleport(mousePos)
+        if not tpEnabled then return end
+        local targetPos = mousePos.Hit.Position
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local root = char.HumanoidRootPart
+            root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+
+            local part = Instance.new("Part")
+            part.Size = Vector3.new(2, 0.5, 2)
+            part.Position = targetPos
+            part.Anchored = true
+            part.CanCollide = false
+            part.BrickColor = BrickColor.new("Bright violet")
+            part.Material = Enum.Material.Neon
+            part.Transparency = 0.5
+            part.Parent = workspace
+            game:GetService("Debris"):AddItem(part, 0.5)
+        end
+    end
+
+    tool.Equipped:Connect(function()
+        tpEnabled = true
+        Mouse.Icon = "rbxasset://SystemCursors/Crosshair"
+        setStatus("TP Ready - Click to teleport", Color3.fromRGB(0,255,150))
+    end)
+
+    tool.Unequipped:Connect(function()
+        tpEnabled = false
+        Mouse.Icon = "rbxasset://SystemCursors/Arrow"
+        setStatus("TP Off")
+    end)
+
+    tool.Activated:Connect(function()
+        if tpEnabled then
+            teleport(Mouse)
+        end
+    end)
+
+    return tool
+end
+
 -- ========== PLAYER LIST FUNCTIONS ==========
 local function updatePlayerList()
     for _, btn in pairs(PlayerListContainer:GetChildren()) do
@@ -545,7 +596,7 @@ createSlider("Jump Power", 50, 200, 50, function(val)
 end)
 
 createTumbler("Infinite Jump", false).onToggle(function(st) infiniteJumpEnabled = st end)
-createTumbler("Bhop", false).onToggle(function(st) bhopEnabled = st end)
+createTumbler("Bhop (FIXED)", false).onToggle(function(st) bhopEnabled = st end)
 createTumbler("Spinbot", false).onToggle(function(st) spinbotEnabled = st end)
 createSlider("Spinbot Speed", 5, 50, 20, function(val) spinbotSpeed = val end)
 
@@ -563,6 +614,27 @@ createTumbler("Player List GUI", false).onToggle(function(st)
     playerListEnabled = st
     PlayerListGui.Enabled = st
     if st then updatePlayerList() end
+end)
+
+-- TELEPORT TOOL
+createTumbler("Teleport Tool", false).onToggle(function(st)
+    if st then
+        if not tpTool then
+            tpTool = createTPTool()
+            tpTool.Parent = LocalPlayer.Backpack
+            setStatus("Teleport Tool added to backpack!", Color3.fromRGB(0,255,150))
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") then
+                char.Humanoid:EquipTool(tpTool)
+            end
+        end
+    else
+        if tpTool then
+            tpTool:Destroy()
+            tpTool = nil
+        end
+        setStatus("Teleport Tool removed", Color3.fromRGB(255,150,0))
+    end
 end)
 
 -- WORLD & RENDER
@@ -652,6 +724,16 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- BHOP (FIXED)
+RunService.Heartbeat:Connect(function()
+    if bhopEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = LocalPlayer.Character.Humanoid
+        if hum.MoveDirection.Magnitude > 0 and hum.FloorMaterial ~= Enum.Material.Air then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
 -- Spinbot Loop
 RunService.RenderStepped:Connect(function()
     if spinbotEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -691,6 +773,16 @@ RunService.Heartbeat:Connect(function()
             if spawn then
                 LocalPlayer.Character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0, 3, 0)
             end
+        end
+    end
+end)
+
+-- Anti-Fall
+RunService.Heartbeat:Connect(function()
+    if antiFallEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = LocalPlayer.Character.Humanoid
+        if hum:GetState() == Enum.HumanoidStateType.FallingDown then
+            hum:ChangeState(Enum.HumanoidStateType.Landed)
         end
     end
 end)
@@ -805,7 +897,6 @@ RunService.RenderStepped:Connect(function()
 
                     text.Text = content
                     text.Visible = true
-                    textTextDrawings = textDrawings
                     textDrawings[#textDrawings + 1] = text
                 end
             end
@@ -830,4 +921,4 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-setStatus("WIA HUB v8 Loaded!", Color3.fromRGB(0, 255, 150))
+setStatus("WIA HUB v8 Loaded! | Bhop FIXED | TP Tool Added", Color3.fromRGB(0, 255, 150))
