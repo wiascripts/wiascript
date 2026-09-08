@@ -64,13 +64,13 @@ local espLines, tracerLines, textDrawings = {}, {}, {}
 -- Drawing API FOV Circle
 local fovCircle = nil
 if Drawing then
-fovCircle = Drawing.new("Circle")
-fovCircle.Thickness = 1.5
-fovCircle.NumSides = 60
-fovCircle.Radius = aimbotFOV
-fovCircle.Filled = false
-fovCircle.Visible = false
-fovCircle.Color = Color3.fromRGB(180, 0, 255)
+    fovCircle = Drawing.new("Circle")
+    fovCircle.Thickness = 1.5
+    fovCircle.NumSides = 60
+    fovCircle.Radius = aimbotFOV
+    fovCircle.Filled = false
+    fovCircle.Visible = false
+    fovCircle.Color = Color3.fromRGB(180, 0, 255)
 end
 
 -- ========== PLAYER LIST GUI (SEPARATE TARGET PANEL) ==========
@@ -124,139 +124,137 @@ TargetStatus.Parent = PlayerListMain
 
 -- Draggable Engine for Player List
 local function makeDraggable(frame)
-local dragging, dragStart, startPos = false, nil, nil
-frame.InputBegan:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 then
-dragging = true
-dragStart = input.Position
-startPos = frame.Position
-end
-end)
-UserInputService.InputChanged:Connect(function(input)
-if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-local delta = input.Position - dragStart
-frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-end)
-UserInputService.InputEnded:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-end)
+    local dragging, dragStart, startPos = false, nil, nil
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
 end
 makeDraggable(PlayerListMain)
 
 -- TELEPORT TOOL LOGIC
 local function createTPTool()
-local tool = Instance.new("Tool")
-tool.Name = "WIA_TP"
-tool.RequiresHandle = false
-tool.CanBeDropped = false
+    local tool = Instance.new("Tool")
+    tool.Name = "WIA_TP"
+    tool.RequiresHandle = false
+    tool.CanBeDropped = false
 
-local function teleport(mousePos)  
-    if not tpEnabled then return end  
-    local targetPos = mousePos.Hit.Position  
-    local char = LocalPlayer.Character  
-    if char and char:FindFirstChild("HumanoidRootPart") then  
-        local root = char.HumanoidRootPart  
-        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))  
+    local function teleport(mousePos)
+        if not tpEnabled then return end
+        local targetPos = mousePos.Hit.Position
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local root = char.HumanoidRootPart
+            root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
 
-        local part = Instance.new("Part")  
-        part.Size = Vector3.new(2, 0.5, 2)  
-        part.Position = targetPos  
-        part.Anchored = true  
-        part.CanCollide = false  
-        part.BrickColor = BrickColor.new("Bright violet")  
-        part.Material = Enum.Material.Neon  
-        part.Transparency = 0.5  
-        part.Parent = workspace  
-        game:GetService("Debris"):AddItem(part, 0.5)  
-    end  
-end  
+            local part = Instance.new("Part")    
+            part.Size = Vector3.new(2, 0.5, 2)    
+            part.Position = targetPos    
+            part.Anchored = true    
+            part.CanCollide = false    
+            part.BrickColor = BrickColor.new("Bright violet")    
+            part.Material = Enum.Material.Neon    
+            part.Transparency = 0.5    
+            part.Parent = workspace    
+            game:GetService("Debris"):AddItem(part, 0.5)    
+        end
+    end
 
-tool.Equipped:Connect(function()  
-    tpEnabled = true  
-    Mouse.Icon = "rbxasset://SystemCursors/Crosshair"  
-end)  
+    tool.Equipped:Connect(function()
+        tpEnabled = true
+        Mouse.Icon = "rbxasset://SystemCursors/Crosshair"
+    end)
 
-tool.Unequipped:Connect(function()  
-    tpEnabled = false  
-    Mouse.Icon = "rbxasset://SystemCursors/Arrow"  
-end)  
+    tool.Unequipped:Connect(function()
+        tpEnabled = false
+        Mouse.Icon = "rbxasset://SystemCursors/Arrow"
+    end)
 
-tool.Activated:Connect(function()  
-    if tpEnabled then teleport(Mouse) end  
-end)  
+    tool.Activated:Connect(function()
+        if tpEnabled then teleport(Mouse) end
+    end)
 
-return tool
-
+    return tool
 end
 
 -- PLAYER LIST UPDATER
 local function updatePlayerList()
-for _, btn in pairs(PlayerListContainer:GetChildren()) do btn:Destroy() end
-local players = Players:GetPlayers()
-local y = 0
+    for _, btn in pairs(PlayerListContainer:GetChildren()) do btn:Destroy() end
+    local players = Players:GetPlayers()
+    local y = 0
 
-for _, plr in pairs(players) do  
-    if plr ~= LocalPlayer then  
-        local btn = Instance.new("TextButton")  
-        btn.Size = UDim2.new(1, 0, 0, 25)  
-        btn.Position = UDim2.new(0, 0, 0, y)  
-        btn.Text = plr.Name .. "  [TP]  [AIM]"  
-        btn.TextColor3 = Color3.fromRGB(255,255,255)  
-        btn.BackgroundColor3 = (aimbotSelectedTarget == plr) and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40,40,55)  
-        btn.BorderSizePixel = 0  
-        btn.Font = Enum.Font.Gotham  
-        btn.TextSize = 11  
-        btn.Parent = PlayerListContainer  
+    for _, plr in pairs(players) do
+        if plr ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            btn.Position = UDim2.new(0, 0, 0, y)
+            btn.Text = plr.Name .. "  [TP]  [AIM]"
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+            btn.BackgroundColor3 = (aimbotSelectedTarget == plr) and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40,40,55)
+            btn.BorderSizePixel = 0
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 11
+            btn.Parent = PlayerListContainer
 
-        btn.MouseButton1Click:Connect(function()  
-            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then  
-                LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)  
-            end  
-        end)  
+            btn.MouseButton1Click:Connect(function()    
+                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then    
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)    
+                end    
+            end)    
 
-        btn.MouseButton2Click:Connect(function()  
-            if aimbotSelectedTarget == plr then  
-                aimbotSelectedTarget = nil  
-                TargetStatus.Text = "Target: Auto (Closest)"  
-                TargetStatus.TextColor3 = Color3.fromRGB(200, 200, 200)  
-            else  
-                aimbotSelectedTarget = plr  
-                TargetStatus.Text = "Target: " .. plr.Name  
-                TargetStatus.TextColor3 = Color3.fromRGB(0, 255, 100)  
-            end  
-            updatePlayerList()  
-        end)  
+            btn.MouseButton2Click:Connect(function()    
+                if aimbotSelectedTarget == plr then    
+                    aimbotSelectedTarget = nil    
+                    TargetStatus.Text = "Target: Auto (Closest)"    
+                    TargetStatus.TextColor3 = Color3.fromRGB(200, 200, 200)    
+                else    
+                    aimbotSelectedTarget = plr    
+                    TargetStatus.Text = "Target: " .. plr.Name    
+                    TargetStatus.TextColor3 = Color3.fromRGB(0, 255, 100)    
+                end    
+                updatePlayerList()    
+            end)    
 
-        y = y + 27  
-    end  
-end  
-PlayerListContainer.Size = UDim2.new(1, 0, 0, y)  
-playerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 10)
-
+            y = y + 27    
+        end
+    end
+    PlayerListContainer.Size = UDim2.new(1, 0, 0, y)
+    playerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 10)
 end
 
 -- AIMBOT ENGINE TARGET SELECTOR
 local function getAimbotTarget()
-if aimbotSelectedTarget and aimbotSelectedTarget.Character and aimbotSelectedTarget.Character:FindFirstChild("Head") then
-return aimbotSelectedTarget
-end
-local closest = nil
-local minDist = aimbotFOV
-for _, plr in pairs(Players:GetPlayers()) do
-if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
-local head = plr.Character.Head
-local pos, onScreen = Camera:WorldToScreenPoint(head.Position)
-if onScreen then
-local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-if dist < minDist then
-minDist = dist
-closest = plr
-end
-end
-end
-end
-return closest
+    if aimbotSelectedTarget and aimbotSelectedTarget.Character and aimbotSelectedTarget.Character:FindFirstChild("Head") then
+        return aimbotSelectedTarget
+    end
+    local closest = nil
+    local minDist = aimbotFOV
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+            local head = plr.Character.Head
+            local pos, onScreen = Camera:WorldToScreenPoint(head.Position)
+            if onScreen then
+                local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = plr
+                end
+            end
+        end
+    end
+    return closest
 end
 
 -- ================================================================= --
@@ -264,707 +262,424 @@ end
 -- ================================================================= --
 
 local Window = Rayfield:CreateWindow({
-Name = "WIA HUB v8.0 | Ultimate Edition",
-Icon = 0,
-LoadingTitle = "WIA HUB v8.0",
-LoadingSubtitle = "by whitewia / tordark",
-Theme = "Purple",
-DisableRayfieldPrompts = false,
-DisableBuildWarnings = false,
-ConfigurationSaving = {
-Enabled = false
-},
-KeySystem = false
+    Name = "WIA HUB v8.0 | Ultimate Edition",
+    Icon = 0,
+    LoadingTitle = "WIA HUB v8.0",
+    LoadingSubtitle = "by whitewia / tordark",
+    Theme = "Purple",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = false
+    },
+    KeySystem = false
 })
 
 -- TABS
-local CombatTab = Window:CreateTab("Combat & Aim", 4483362458)
-local VisualsTab = Window:CreateTab("ESP & Visuals", 4483345998)
-local MovementTab = Window:CreateTab("Movement", 4483362458)
-local PlayerTab = Window:CreateTab("Player & Tools", 4483362458)
-local WorldTab = Window:CreateTab("World & Auto", 4483362458)
-local ServerTab = Window:CreateTab("Server", 4483362458)
+local CombatTab = Window:CreateTab("Combat & Aim", 0)
+local VisualsTab = Window:CreateTab("ESP & Visuals", 0)
+local MovementTab = Window:CreateTab("Movement", 0)
+local PlayerTab = Window:CreateTab("Player & Tools", 0)
+local WorldTab = Window:CreateTab("World & Auto", 0)
+local ServerTab = Window:CreateTab("Server", 0)
+local MM2Tab = Window:CreateTab("MM2 Master", 0)
 
 -- ========== COMBAT TAB ==========
 CombatTab:CreateToggle({
-Name = "Aimbot",
-CurrentValue = false,
-Flag = "AimbotToggle",
-Callback = function(Value) aimbotEnabled = Value end,
+    Name = "Aimbot",
+    CurrentValue = false,
+    Flag = "AimbotToggle",
+    Callback = function(Value) aimbotEnabled = Value end,
 })
 
 CombatTab:CreateToggle({
-Name = "Show FOV Circle",
-CurrentValue = true,
-Flag = "FOVCircleToggle",
-Callback = function(Value) fovCircleVisible = Value end,
+    Name = "Show FOV Circle",
+    CurrentValue = true,
+    Flag = "FOVCircleToggle",
+    Callback = function(Value) fovCircleVisible = Value end,
 })
 
 CombatTab:CreateSlider({
-Name = "Aimbot FOV",
-Range = {10, 400},
-Increment = 1,
-Suffix = "px",
-CurrentValue = 90,
-Flag = "AimbotFOVSlider",
-Callback = function(Value) aimbotFOV = Value end,
+    Name = "Aimbot FOV",
+    Range = {10, 400},
+    Increment = 1,
+    Suffix = "px",
+    CurrentValue = 90,
+    Flag = "AimbotFOVSlider",
+    Callback = function(Value) aimbotFOV = Value end,
 })
 
 CombatTab:CreateSlider({
-Name = "Aimbot Smoothness",
-Range = {1, 20},
-Increment = 1,
-Suffix = "",
-CurrentValue = 5,
-Flag = "AimbotSmoothSlider",
-Callback = function(Value) aimbotSmoothness = Value end,
+    Name = "Aimbot Smoothness",
+    Range = {1, 20},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 5,
+    Flag = "AimbotSmoothSlider",
+    Callback = function(Value) aimbotSmoothness = Value end,
 })
 
 CombatTab:CreateToggle({
-Name = "Triggerbot (AutoShot)",
-CurrentValue = false,
-Flag = "TriggerbotToggle",
-Callback = function(Value) triggerbotEnabled = Value end,
+    Name = "Triggerbot (AutoShot)",
+    CurrentValue = false,
+    Flag = "TriggerbotToggle",
+    Callback = function(Value) triggerbotEnabled = Value end,
 })
 
 CombatTab:CreateToggle({
-Name = "Hitbox Expander",
-CurrentValue = false,
-Flag = "HitboxToggle",
-Callback = function(Value)
-hitboxEnabled = Value
-if not Value then
-for _, plr in pairs(Players:GetPlayers()) do
-if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-plr.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
-end
-end
-end
-end,
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Flag = "HitboxToggle",
+    Callback = function(Value)
+        hitboxEnabled = Value
+        if not Value then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    plr.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
+                end
+            end
+        end
+    end,
 })
 
 CombatTab:CreateSlider({
-Name = "Hitbox Size",
-Range = {2, 20},
-Increment = 1,
-Suffix = " studs",
-CurrentValue = 5,
-Flag = "HitboxSizeSlider",
-Callback = function(Value) hitboxSize = Value end,
+    Name = "Hitbox Size",
+    Range = {2, 20},
+    Increment = 1,
+    Suffix = " studs",
+    CurrentValue = 5,
+    Flag = "HitboxSizeSlider",
+    Callback = function(Value) hitboxSize = Value end,
 })
 
 -- ========== VISUALS TAB ==========
 VisualsTab:CreateToggle({
-Name = "ESP Boxes",
-CurrentValue = true,
-Flag = "ESPBoxToggle",
-Callback = function(Value) espBoxEnabled = Value end,
+    Name = "ESP Boxes",
+    CurrentValue = true,
+    Flag = "ESPBoxToggle",
+    Callback = function(Value) espBoxEnabled = Value end,
 })
 
 VisualsTab:CreateToggle({
-Name = "ESP Tracers",
-CurrentValue = true,
-Flag = "ESPTracerToggle",
-Callback = function(Value) espTracerEnabled = Value end,
+    Name = "ESP Tracers",
+    CurrentValue = true,
+    Flag = "ESPTracerToggle",
+    Callback = function(Value) espTracerEnabled = Value end,
 })
 
 VisualsTab:CreateToggle({
-Name = "ESP Names",
-CurrentValue = true,
-Flag = "ESPNameToggle",
-Callback = function(Value) espNamesEnabled = Value end,
+    Name = "ESP Names",
+    CurrentValue = true,
+    Flag = "ESPNameToggle",
+    Callback = function(Value) espNamesEnabled = Value end,
 })
 
 VisualsTab:CreateToggle({
-Name = "ESP Distance & Health",
-CurrentValue = true,
-Flag = "ESPDistHPToggle",
-Callback = function(Value)
-espDistanceEnabled = Value
-espHealthEnabled = Value
-end,
+    Name = "ESP Distance & Health",
+    CurrentValue = true,
+    Flag = "ESPDistHPToggle",
+    Callback = function(Value)
+        espDistanceEnabled = Value
+        espHealthEnabled = Value
+    end,
 })
 
 VisualsTab:CreateToggle({
-Name = "Wallhack (Highlight)",
-CurrentValue = false,
-Flag = "WallhackToggle",
-Callback = function(Value)
-wallhackEnabled = Value
-if not Value then
-for _, plr in pairs(Players:GetPlayers()) do
-if plr.Character and plr.Character:FindFirstChild("WIA_WH") then
-plr.Character.WIA_WH:Destroy()
-end
-end
-end
-end,
+    Name = "Wallhack (Highlight)",
+    CurrentValue = false,
+    Flag = "WallhackToggle",
+    Callback = function(Value)
+        wallhackEnabled = Value
+        if not Value then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr.Character and plr.Character:FindFirstChild("WIA_WH") then
+                    plr.Character.WIA_WH:Destroy()
+                end
+            end
+        end
+    end,
 })
 
 -- ========== MOVEMENT TAB ==========
 MovementTab:CreateToggle({
-Name = "Flight",
-CurrentValue = false,
-Flag = "FlightToggle",
-Callback = function(Value)
-flightEnabled = Value
-if Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-bodyVelocity = Instance.new("BodyVelocity", LocalPlayer.Character.HumanoidRootPart)
-bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-bodyGyro = Instance.new("BodyGyro", LocalPlayer.Character.HumanoidRootPart)
-bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-else
-if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
-if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
-end
-end,
+    Name = "Flight",
+    CurrentValue = false,
+    Flag = "FlightToggle",
+    Callback = function(Value)
+        flightEnabled = Value
+        if Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            bodyVelocity = Instance.new("BodyVelocity", LocalPlayer.Character.HumanoidRootPart)
+            bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            bodyGyro = Instance.new("BodyGyro", LocalPlayer.Character.HumanoidRootPart)
+            bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        else
+            if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+            if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+        end
+    end,
 })
 
 MovementTab:CreateSlider({
-Name = "Fly Speed",
-Range = {10, 300},
-Increment = 5,
-Suffix = " speed",
-CurrentValue = 50,
-Flag = "FlySpeedSlider",
-Callback = function(Value) flySpeed = Value end,
+    Name = "Fly Speed",
+    Range = {10, 300},
+    Increment = 5,
+    Suffix = " speed",
+    CurrentValue = 50,
+    Flag = "FlySpeedSlider",
+    Callback = function(Value) flySpeed = Value end,
 })
 
 MovementTab:CreateToggle({
-Name = "Noclip",
-CurrentValue = false,
-Flag = "NoclipToggle",
-Callback = function(Value) noclipEnabled = Value end,
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "NoclipToggle",
+    Callback = function(Value) noclipEnabled = Value end,
 })
 
 MovementTab:CreateToggle({
-Name = "CFrame Speed (Bypass)",
-CurrentValue = false,
-Flag = "CFrameSpeedToggle",
-Callback = function(Value) cframeSpeedEnabled = Value end,
+    Name = "CFrame Speed (Bypass)",
+    CurrentValue = false,
+    Flag = "CFrameSpeedToggle",
+    Callback = function(Value) cframeSpeedEnabled = Value end,
 })
 
 MovementTab:CreateSlider({
-Name = "CFrame Multiplier",
-Range = {1, 10},
-Increment = 1,
-Suffix = "x",
-CurrentValue = 2,
-Flag = "CFrameMultSlider",
-Callback = function(Value) cframeSpeedValue = Value end,
+    Name = "CFrame Multiplier",
+    Range = {1, 10},
+    Increment = 1,
+    Suffix = "x",
+    CurrentValue = 2,
+    Flag = "CFrameMultSlider",
+    Callback = function(Value) cframeSpeedValue = Value end,
 })
 
 MovementTab:CreateSlider({
-Name = "Walk Speed",
-Range = {16, 200},
-Increment = 1,
-Suffix = "",
-CurrentValue = 16,
-Flag = "WalkSpeedSlider",
-Callback = function(Value)
-walkSpeedValue = Value
-if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-LocalPlayer.Character.Humanoid.WalkSpeed = Value
-end
-end,
+    Name = "Walk Speed",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 16,
+    Flag = "WalkSpeedSlider",
+    Callback = function(Value)
+        walkSpeedValue = Value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end,
 })
 
 MovementTab:CreateSlider({
-Name = "Jump Power",
-Range = {50, 200},
-Increment = 1,
-Suffix = "",
-CurrentValue = 50,
-Flag = "JumpPowerSlider",
-Callback = function(Value)
-jumpPowerValue = Value
-if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-LocalPlayer.Character.Humanoid.JumpPower = Value
-end
-end,
+    Name = "Jump Power",
+    Range = {50, 200},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 50,
+    Flag = "JumpPowerSlider",
+    Callback = function(Value)
+        jumpPowerValue = Value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.JumpPower = Value
+        end
+    end,
 })
 
 MovementTab:CreateToggle({
-Name = "Infinite Jump",
-CurrentValue = false,
-Flag = "InfJumpToggle",
-Callback = function(Value) infiniteJumpEnabled = Value end,
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfJumpToggle",
+    Callback = function(Value) infiniteJumpEnabled = Value end,
 })
 
 MovementTab:CreateToggle({
-Name = "Bhop (FIXED)",
-CurrentValue = false,
-Flag = "BhopToggle",
-Callback = function(Value) bhopEnabled = Value end,
+    Name = "Bhop (FIXED)",
+    CurrentValue = false,
+    Flag = "BhopToggle",
+    Callback = function(Value) bhopEnabled = Value end,
 })
 
 MovementTab:CreateToggle({
-Name = "Spinbot",
-CurrentValue = false,
-Flag = "SpinbotToggle",
-Callback = function(Value) spinbotEnabled = Value end,
+    Name = "Spinbot",
+    CurrentValue = false,
+    Flag = "SpinbotToggle",
+    Callback = function(Value) spinbotEnabled = Value end,
 })
 
 MovementTab:CreateSlider({
-Name = "Spinbot Speed",
-Range = {5, 50},
-Increment = 1,
-Suffix = " speed",
-CurrentValue = 20,
-Flag = "SpinbotSpeedSlider",
-Callback = function(Value) spinbotSpeed = Value end,
+    Name = "Spinbot Speed",
+    Range = {5, 50},
+    Increment = 1,
+    Suffix = " speed",
+    CurrentValue = 20,
+    Flag = "SpinbotSpeedSlider",
+    Callback = function(Value) spinbotSpeed = Value end,
 })
 
 -- ========== PLAYER & TOOLS TAB ==========
 PlayerTab:CreateToggle({
-Name = "Godmode",
-CurrentValue = false,
-Flag = "GodmodeToggle",
-Callback = function(Value)
-godmodeEnabled = Value
-if Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-LocalPlayer.Character.Humanoid.Health = LocalPlayer.Character.Humanoid.MaxHealth
-end
-end,
+    Name = "Godmode",
+    CurrentValue = false,
+    Flag = "GodmodeToggle",
+    Callback = function(Value)
+        godmodeEnabled = Value
+        if Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.Health = LocalPlayer.Character.Humanoid.MaxHealth
+        end
+    end,
 })
 
 PlayerTab:CreateToggle({
-Name = "Anti-Void",
-CurrentValue = false,
-Flag = "AntiVoidToggle",
-Callback = function(Value) antiVoidEnabled = Value end,
+    Name = "Anti-Void",
+    CurrentValue = false,
+    Flag = "AntiVoidToggle",
+    Callback = function(Value) antiVoidEnabled = Value end,
 })
 
 PlayerTab:CreateToggle({
-Name = "Anti-Fall Damage",
-CurrentValue = false,
-Flag = "AntiFallToggle",
-Callback = function(Value) antiFallEnabled = Value end,
+    Name = "Anti-Fall Damage",
+    CurrentValue = false,
+    Flag = "AntiFallToggle",
+    Callback = function(Value) antiFallEnabled = Value end,
 })
 
 PlayerTab:CreateToggle({
-Name = "Anti-AFK",
-CurrentValue = false,
-Flag = "AntiAFKToggle",
-Callback = function(Value) antiAFKEnabled = Value end,
+    Name = "Anti-AFK",
+    CurrentValue = false,
+    Flag = "AntiAFKToggle",
+    Callback = function(Value) antiAFKEnabled = Value end,
 })
 
 PlayerTab:CreateToggle({
-Name = "Teleport Tool",
-CurrentValue = false,
-Flag = "TPToolToggle",
-Callback = function(Value)
-if Value then
-if not tpTool then
-tpTool = createTPTool()
-tpTool.Parent = LocalPlayer.Backpack
-local char = LocalPlayer.Character
-if char and char:FindFirstChild("Humanoid") then
-char.Humanoid:EquipTool(tpTool)
-end
-end
-else
-if tpTool then
-tpTool:Destroy()
-tpTool = nil
-end
-end
-end,
+    Name = "Teleport Tool",
+    CurrentValue = false,
+    Flag = "TPToolToggle",
+    Callback = function(Value)
+        if Value then
+            if not tpTool then
+                tpTool = createTPTool()
+                tpTool.Parent = LocalPlayer.Backpack
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("Humanoid") then
+                    char.Humanoid:EquipTool(tpTool)
+                end
+            end
+        else
+            if tpTool then
+                tpTool:Destroy()
+                tpTool = nil
+            end
+        end
+    end,
 })
 
 PlayerTab:CreateToggle({
-Name = "Player List GUI (Target Panel)",
-CurrentValue = false,
-Flag = "PlayerListGUIToggle",
-Callback = function(Value)
-playerListEnabled = Value
-PlayerListGui.Enabled = Value
-if Value then updatePlayerList() end
-end,
+    Name = "Player List GUI (Target Panel)",
+    CurrentValue = false,
+    Flag = "PlayerListGUIToggle",
+    Callback = function(Value)
+        playerListEnabled = Value
+        PlayerListGui.Enabled = Value
+        if Value then updatePlayerList() end
+    end,
 })
 
 PlayerTab:CreateButton({
-Name = "Refresh Player List",
-Callback = function()
-if playerListEnabled then updatePlayerList() end
-end,
+    Name = "Refresh Player List",
+    Callback = function()
+        if playerListEnabled then updatePlayerList() end
+    end,
 })
 
 -- ========== WORLD & AUTO TAB ==========
 WorldTab:CreateToggle({
-Name = "FullBright",
-CurrentValue = false,
-Flag = "FullBrightToggle",
-Callback = function(Value)
-fullBrightEnabled = Value
-if Value then
-originalBrightness = Lighting.Brightness
-originalAmbient = Lighting.Ambient
-Lighting.Brightness = 2
-Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-else
-if originalBrightness then Lighting.Brightness = originalBrightness end
-if originalAmbient then Lighting.Ambient = originalAmbient end
-end
-end,
+    Name = "FullBright",
+    CurrentValue = false,
+    Flag = "FullBrightToggle",
+    Callback = function(Value)
+        fullBrightEnabled = Value
+        if Value then
+            originalBrightness = Lighting.Brightness
+            originalAmbient = Lighting.Ambient
+            Lighting.Brightness = 2
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        else
+            if originalBrightness then Lighting.Brightness = originalBrightness end
+            if originalAmbient then Lighting.Ambient = originalAmbient end
+        end
+    end,
 })
 
 WorldTab:CreateToggle({
-Name = "No Fog (FPS Boost)",
-CurrentValue = false,
-Flag = "NoFogToggle",
-Callback = function(Value)
-noFogEnabled = Value
-if Value then
-originalFog = Lighting.FogEnd
-Lighting.FogEnd = 1e6
-else
-if originalFog then Lighting.FogEnd = originalFog end
-end
-end,
+    Name = "No Fog (FPS Boost)",
+    CurrentValue = false,
+    Flag = "NoFogToggle",
+    Callback = function(Value)
+        noFogEnabled = Value
+        if Value then
+            originalFog = Lighting.FogEnd
+            Lighting.FogEnd = 1e6
+        else
+            if originalFog then Lighting.FogEnd = originalFog end
+        end
+    end,
 })
 
 WorldTab:CreateSlider({
-Name = "Camera FOV",
-Range = {50, 120},
-Increment = 1,
-Suffix = " deg",
-CurrentValue = 70,
-Flag = "CamFOV",
-Callback = function(Value) Camera.FieldOfView = Value end,
+    Name = "Camera FOV",
+    Range = {50, 120},
+    Increment = 1,
+    Suffix = " deg",
+    CurrentValue = 70,
+    Flag = "CamFOV",
+    Callback = function(Value) Camera.FieldOfView = Value end,
 })
 
 WorldTab:CreateToggle({
-Name = "AutoClicker",
-CurrentValue = false,
-Flag = "AutoClickerToggle",
-Callback = function(Value) autoClickerEnabled = Value end,
+    Name = "AutoClicker",
+    CurrentValue = false,
+    Flag = "AutoClickerToggle",
+    Callback = function(Value) autoClickerEnabled = Value end,
 })
 
 WorldTab:CreateSlider({
-Name = "Click Delay (ms)",
-Range = {10, 1000},
-Increment = 10,
-Suffix = " ms",
-CurrentValue = 100,
-Flag = "ClickDelaySlider",
-Callback = function(Value) autoClickerDelay = Value end,
+    Name = "Click Delay (ms)",
+    Range = {10, 1000},
+    Increment = 10,
+    Suffix = " ms",
+    CurrentValue = 100,
+    Flag = "ClickDelaySlider",
+    Callback = function(Value) autoClickerDelay = Value end,
 })
 
 WorldTab:CreateToggle({
-Name = "Chat Spam",
-CurrentValue = false,
-Flag = "ChatSpamToggle",
-Callback = function(Value) chatSpamEnabled = Value end,
+    Name = "Chat Spam",
+    CurrentValue = false,
+    Flag = "ChatSpamToggle",
+    Callback = function(Value) chatSpamEnabled = Value end,
 })
 
 -- ========== SERVER TAB ==========
 ServerTab:CreateButton({
-Name = "Rejoin Server",
-Callback = function()
-TeleportService:Teleport(game.PlaceId, LocalPlayer)
-end,
+    Name = "Rejoin Server",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end,
 })
 
 ServerTab:CreateButton({
-Name = "Server Hop",
-Callback = function()
-local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
-for _, s in pairs(servers) do
-if s.playing < s.maxPlayers and s.id ~= game.JobId then
-TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-break
-end
-end
-end,
+    Name = "Server Hop",
+    Callback = function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+        for _, s in pairs(servers) do
+            if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                break
+            end
+        end
+    end,
 })
 
--- ================================================================= --
--- GAME LOOPS & BACKGROUND PROCESSES (UNTOUCHED LOGIC)
--- ================================================================= --
-
--- Aimbot & FOV Circle Loop
-RunService.RenderStepped:Connect(function()
-if fovCircle then
-fovCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
-fovCircle.Radius = aimbotFOV
-fovCircle.Visible = aimbotEnabled and fovCircleVisible
-end
-
-if aimbotEnabled then  
-    local target = getAimbotTarget()  
-    if target and target.Character and target.Character:FindFirstChild("Head") then  
-        local head = target.Character.Head  
-        local targetPos = head.Position  
-        local currentCFrame = Camera.CFrame  
-        local newCFrame = CFrame.new(currentCFrame.Position, targetPos)  
-
-        if aimbotSmoothness > 1 then  
-            Camera.CFrame = currentCFrame:Lerp(newCFrame, 1 / aimbotSmoothness)  
-        else  
-            Camera.CFrame = newCFrame  
-        end  
-    end  
-end
-
-end)
-
--- Triggerbot Loop
-RunService.RenderStepped:Connect(function()
-if triggerbotEnabled then
-local target = Mouse.Target
-if target and target.Parent then
-local plr = Players:GetPlayerFromCharacter(target.Parent)
-if plr and plr ~= LocalPlayer then
-mouse1click()
-end
-end
-end
-end)
-
--- Flight Loop
-RunService.Heartbeat:Connect(function()
-if flightEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and bodyVelocity then
-local root = LocalPlayer.Character.HumanoidRootPart
-local moveDir = Vector3.new(0,0,0)
-if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
-if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
-if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
-if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
-if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
-if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
-
-if moveDir.Magnitude > 0 then  
-        bodyVelocity.Velocity = moveDir.Unit * flySpeed  
-        bodyGyro.CFrame = CFrame.new(root.Position, root.Position + moveDir)  
-    else  
-        bodyVelocity.Velocity = Vector3.new(0,0,0)  
-    end  
-end
-
-end)
-
--- CFrame Speed Loop
-RunService.Heartbeat:Connect(function()
-if cframeSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character:FindFirstChild("Humanoid") then
-local hum = LocalPlayer.Character.Humanoid
-local root = LocalPlayer.Character.HumanoidRootPart
-if hum.MoveDirection.Magnitude > 0 then
-root.CFrame = root.CFrame + (hum.MoveDirection * (cframeSpeedValue / 10))
-end
-end
-end)
-
--- BHOP
-RunService.Heartbeat:Connect(function()
-if bhopEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-local hum = LocalPlayer.Character.Humanoid
-if hum.MoveDirection.Magnitude > 0 and hum.FloorMaterial ~= Enum.Material.Air then
-hum:ChangeState(Enum.HumanoidStateType.Jumping)
-end
-end
-end)
-
--- Spinbot Loop
-RunService.RenderStepped:Connect(function()
-if spinbotEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinbotSpeed), 0)
-end
-end)
-
--- Noclip & Hitbox & Godmode Loop
-RunService.Heartbeat:Connect(function()
-local char = LocalPlayer.Character
-if char then
-if noclipEnabled then
-for _, p in pairs(char:GetDescendants()) do
-if p:IsA("BasePart") then p.CanCollide = false end
-end
-end
-if godmodeEnabled and char:FindFirstChild("Humanoid") then
-char.Humanoid.Health = char.Humanoid.MaxHealth
-end
-end
-
-if hitboxEnabled then  
-    for _, plr in pairs(Players:GetPlayers()) do  
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then  
-            plr.Character.HumanoidRootPart.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)  
-            plr.Character.HumanoidRootPart.Transparency = 0.7  
-        end  
-    end  
-end
-
-end)
-
--- Anti-Void Loop
-RunService.Heartbeat:Connect(function()
-if antiVoidEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-if LocalPlayer.Character.HumanoidRootPart.Position.Y < -50 then
-local spawn = workspace:FindFirstChild("SpawnLocation")
-if spawn then
-LocalPlayer.Character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0, 3, 0)
-end
-end
-end
-end)
-
--- Anti-Fall
-RunService.Heartbeat:Connect(function()
-if antiFallEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-local hum = LocalPlayer.Character.Humanoid
-if hum:GetState() == Enum.HumanoidStateType.FallingDown then
-hum:ChangeState(Enum.HumanoidStateType.Landed)
-end
-end
-end)
-
--- AutoClicker Loop
-task.spawn(function()
-while true do
-task.wait(autoClickerDelay / 1000)
-if autoClickerEnabled then mouse1click() end
-end
-end)
-
--- Chat Spam Loop
-task.spawn(function()
-while true do
-task.wait(chatSpamDelay)
-if chatSpamEnabled then
-local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-if chatEvents and chatEvents:FindFirstChild("SayMessageRequest") then
-chatEvents.SayMessageRequest:FireServer(chatSpamMessage, "All")
-end
-end
-end
-end)
-
--- Anti-AFK Loop
-local vu = game:GetService("VirtualUser")
-LocalPlayer.Idled:Connect(function()
-if antiAFKEnabled then
-vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-task.wait(1)
-vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-end
-end)
-
--- Infinite Jump
-UserInputService.JumpRequest:Connect(function()
-if infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-end
-end)
-
--- ADVANCED DRAWING ESP ENGINE
-local PURPLE = Color3.fromRGB(180, 0, 255)
-
-RunService.RenderStepped:Connect(function()
-for i = #espLines, 1, -1 do espLines[i]:Remove() espLines[i] = nil end
-for i = #tracerLines, 1, -1 do tracerLines[i]:Remove() tracerLines[i] = nil end
-for i = #textDrawings, 1, -1 do textDrawings[i]:Remove() textDrawings[i] = nil end
-
-if not (espBoxEnabled or espTracerEnabled or espNamesEnabled or espDistanceEnabled) then return end  
-
-local camPos = Camera.CFrame.Position  
-local viewport = Camera.ViewportSize  
-
-for _, plr in pairs(Players:GetPlayers()) do  
-    if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") and plr.Character:FindFirstChild("Humanoid") then  
-        local head = plr.Character.Head  
-        local hum = plr.Character.Humanoid  
-        local pos, onScreen = Camera:WorldToScreenPoint(head.Position)  
-
-        if onScreen then  
-            local dist = math.floor((head.Position - camPos).Magnitude)  
-            local size = math.clamp(100 / dist * 10, 15, 45)  
-
-            if espBoxEnabled then  
-                local lines = { Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line") }  
-                local x, y = pos.X - size/2, pos.Y - size/2  
-                lines[1].From = Vector2.new(x, y) lines[1].To = Vector2.new(x + size, y)  
-                lines[2].From = Vector2.new(x + size, y) lines[2].To = Vector2.new(x + size, y + size)  
-                lines[3].From = Vector2.new(x + size, y + size) lines[3].To = Vector2.new(x, y + size)  
-                lines[4].From = Vector2.new(x, y + size) lines[4].To = Vector2.new(x, y)  
-
-                for j = 1, 4 do  
-                    lines[j].Color = PURPLE  
-                    lines[j].Thickness = 2  
-                    lines[j].Transparency = 1  
-                    lines[j].Visible = true  
-                    espLines[#espLines + 1] = lines[j]  
-                end  
-            end  
-
-            if espTracerEnabled then  
-                local tracer = Drawing.new("Line")  
-                tracer.From = Vector2.new(viewport.X / 2, viewport.Y)  
-                tracer.To = Vector2.new(pos.X, pos.Y)  
-                tracer.Color = PURPLE  
-                tracer.Thickness = 1.5  
-                tracer.Transparency = 0.7  
-                tracer.Visible = true  
-                tracerLines[#tracerLines + 1] = tracer  
-            end  
-
-            if espNamesEnabled or espDistanceEnabled then  
-                local text = Drawing.new("Text")  
-                text.Position = Vector2.new(pos.X, pos.Y - size/2 - 15)  
-                text.Size = 13  
-                text.Center = true  
-                text.Outline = true  
-                text.Color = Color3.fromRGB(255, 255, 255)  
-
-                local content = ""  
-                if espNamesEnabled then content = content .. plr.Name .. " " end  
-                if espHealthEnabled then content = content .. "[" .. math.floor(hum.Health) .. "HP] " end  
-                if espDistanceEnabled then content = content .. "(" .. dist .. "m)" end  
-
-                text.Text = content  
-                text.Visible = true  
-                textDrawings[#textDrawings + 1] = text  
-            end  
-        end  
-    end  
-end
-
-end)
-
--- Wallhack Auto-Apply Loop
-RunService.Heartbeat:Connect(function()
-if wallhackEnabled then
-for _, plr in pairs(Players:GetPlayers()) do
-if plr ~= LocalPlayer and plr.Character and not plr.Character:FindFirstChild("WIA_WH") then
-local hl = Instance.new("Highlight")
-hl.Name = "WIA_WH"
-hl.FillColor = Color3.fromRGB(180, 0, 255)
-hl.FillTransparency = 0.3
-hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-hl.Parent = plr.Character
-end
-end
-end
-end)
-
-Rayfield:Notify({
-Title = "WIA HUB v8.0",
-Content = "Успешно загружено в стиле Rayfield!",
-Duration = 4,
-Image = 4483362458,
-})
-
-
----
-
--- ================================================================= --
--- 🔪 ULTIMATE MM2 TAB (FULL FUNCTIONAL & FIXED)
--- ================================================================= --
-local MM2Tab = Window:CreateTab("🔪 MM2 Master", 4483362458)
-
--- ------------------ ВИЗУАЛЫ (ESP) ------------------
-MM2Tab:CreateSection("👁️ ESP & Информатор")
+-- ========== MM2 MASTER TAB ==========
+MM2Tab:CreateSection("ESP & Информатор")
 
 local RoleESPEnabled = false
 MM2Tab:CreateToggle({
@@ -1007,8 +722,7 @@ MM2Tab:CreateToggle({
     Callback = function(Value) CoinESPEnabled = Value end
 })
 
--- ------------------ АВТО-ФАРМ & УТИЛИТЫ ------------------
-MM2Tab:CreateSection("💰 Авто-Фарм и Утилиты")
+MM2Tab:CreateSection("Авто-Фарм и Утилиты")
 
 local AutoFarmCoins = false
 local AutoFarmSpeed = 25
@@ -1037,13 +751,27 @@ MM2Tab:CreateToggle({
     Callback = function(Value) AutoGrabGun = Value end
 })
 
+local function getGunDrop()
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name == "GunDrop" or (obj:IsA("Model") and obj.Name:lower():find("gun")) then
+            return obj
+        end
+    end
+    for _, child in pairs(workspace:GetDescendants()) do
+        if child.Name == "GunDrop" then
+            return child.Parent:IsA("Model") and child.Parent or child
+        end
+    end
+    return nil
+end
+
 MM2Tab:CreateButton({
-    Name = "⚡ Мгновенно ТП к пистолету",
+    Name = "Мгновенно ТП к пистолету",
     Callback = function()
         local gunDrop = getGunDrop()
         local char = LocalPlayer.Character
         if gunDrop and char and char:FindFirstChild("HumanoidRootPart") then
-            local targetPos = gunDrop:IsA("Model") and (gunDrop.PrimaryPart or gunDrop:FindFirstChildWhichIsA("BasePart")) or gunDrop
+            local targetPart = gunDrop:IsA("Model") and (gunDrop.PrimaryPart or gunDrop:FindFirstChildWhichIsA("BasePart")) or (gunDrop:IsA("BasePart") and gunDrop or nil)
             if targetPart then
                 char.HumanoidRootPart.CFrame = targetPart.CFrame * CFrame.new(0, 2, 0)
             end
@@ -1061,8 +789,7 @@ MM2Tab:CreateToggle({
     Callback = function(Value) AntiKnifeEnabled = Value end
 })
 
--- ------------------ БОЙ: ШЕРИФ ------------------
-MM2Tab:CreateSection("🎯 Бой: Шериф / Герой")
+MM2Tab:CreateSection("Бой: Шериф / Герой")
 
 local TrueSilentAimMM2 = false
 MM2Tab:CreateToggle({
@@ -1088,8 +815,7 @@ MM2Tab:CreateToggle({
     Callback = function(Value) AutoShootEnabled = Value end
 })
 
--- ------------------ БОЙ: МАРДЕР ------------------
-MM2Tab:CreateSection("🔪 Бой: Мардер")
+MM2Tab:CreateSection("Бой: Мардер")
 
 local KillAuraEnabled = false
 MM2Tab:CreateToggle({
@@ -1100,128 +826,374 @@ MM2Tab:CreateToggle({
 })
 
 MM2Tab:CreateButton({
-    Name = "☠️ KILL ALL (Убить всех за Мардера)",
+    Name = "KILL ALL (Убить всех за Мардера)",
     Callback = function()
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
-        local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
-        if not knife then  
-            Rayfield:Notify({Title = "Ошибка", Content = "У тебя нет ножа Мардера!", Duration = 3})  
-            return  
-        end  
+        local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))  
+        if not knife then    
+            Rayfield:Notify({Title = "Ошибка", Content = "У тебя нет ножа Мардера!", Duration = 3})    
+            return    
+        end    
 
-        if knife.Parent == LocalPlayer.Backpack then 
-            char.Humanoid:EquipTool(knife) 
-        end  
+        if knife.Parent == LocalPlayer.Backpack then   
+            char.Humanoid:EquipTool(knife)   
+        end    
 
-        task.spawn(function()  
-            for _, v in pairs(Players:GetPlayers()) do  
-                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then  
-                    local targetHrp = v.Character.HumanoidRootPart
-                    -- Быстрый телепорт за спину и попытка атаки
-                    for i = 1, 3 do
-                        char.HumanoidRootPart.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 1.2)
-                        if knife:FindFirstChild("Stab") then
-                            knife.Stab:FireServer()
-                        end
-                        if mouse1click then mouse1click() end
-                        task.wait(0.05)
-                    end
-                end  
-            end  
-        end)  
+        task.spawn(function()    
+            for _, v in pairs(Players:GetPlayers()) do    
+                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then    
+                    local targetHrp = v.Character.HumanoidRootPart  
+                    for i = 1, 3 do  
+                        char.HumanoidRootPart.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 1.2)  
+                        if knife:FindFirstChild("Stab") then  
+                            knife.Stab:FireServer()  
+                        end  
+                        if mouse1click then mouse1click() end  
+                        task.wait(0.05)  
+                    end  
+                end    
+            end    
+        end)    
     end
 })
 
 -- ================================================================= --
--- ⚙️ MM2 CORE ENGINE & BACKGROUND LOOPS
+-- GAME LOOPS & BACKGROUND PROCESSES
 -- ================================================================= --
 
--- Поиск упавшего пистолета
-local function getGunDrop()
-    for _, obj in pairs(workspace:GetChildren()) do
-        if obj.Name == "GunDrop" or (obj:IsA("Model") and obj.Name:lower():find("gun")) then
-            return obj
-        end
+-- Aimbot & FOV Circle Loop
+RunService.RenderStepped:Connect(function()
+    if fovCircle then
+        fovCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
+        fovCircle.Radius = aimbotFOV
+        fovCircle.Visible = aimbotEnabled and fovCircleVisible
     end
-    for _, child in pairs(workspace:GetDescendants()) do
-        if child.Name == "GunDrop" then
-            return child.Parent:IsA("Model") and child.Parent or child
-        end
-    end
-    return nil
-end
 
--- Поиск роли игрока
+    if aimbotEnabled then
+        local target = getAimbotTarget()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local head = target.Character.Head
+            local targetPos = head.Position
+            local currentCFrame = Camera.CFrame
+            local newCFrame = CFrame.new(currentCFrame.Position, targetPos)
+
+            if aimbotSmoothness > 1 then    
+                Camera.CFrame = currentCFrame:Lerp(newCFrame, 1 / aimbotSmoothness)    
+            else    
+                Camera.CFrame = newCFrame    
+            end    
+        end
+    end
+end)
+
+-- Triggerbot Loop
+RunService.RenderStepped:Connect(function()
+    if triggerbotEnabled then
+        local target = Mouse.Target
+        if target and target.Parent then
+            local plr = Players:GetPlayerFromCharacter(target.Parent)
+            if plr and plr ~= LocalPlayer and mouse1click then
+                mouse1click()
+            end
+        end
+    end
+end)
+
+-- Flight Loop
+RunService.Heartbeat:Connect(function()
+    if flightEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and bodyVelocity then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local moveDir = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
+
+        if moveDir.Magnitude > 0 then
+            bodyVelocity.Velocity = moveDir.Unit * flySpeed
+            bodyGyro.CFrame = CFrame.new(root.Position, root.Position + moveDir)
+        else
+            bodyVelocity.Velocity = Vector3.new(0,0,0)
+        end
+    end
+end)
+
+-- CFrame Speed Loop
+RunService.Heartbeat:Connect(function()
+    if cframeSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = LocalPlayer.Character.Humanoid
+        local root = LocalPlayer.Character.HumanoidRootPart
+        if hum.MoveDirection.Magnitude > 0 then
+            root.CFrame = root.CFrame + (hum.MoveDirection * (cframeSpeedValue / 10))
+        end
+    end
+end)
+
+-- BHOP
+RunService.Heartbeat:Connect(function()
+    if bhopEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = LocalPlayer.Character.Humanoid
+        if hum.MoveDirection.Magnitude > 0 and hum.FloorMaterial ~= Enum.Material.Air then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- Spinbot Loop
+RunService.RenderStepped:Connect(function()
+    if spinbotEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinbotSpeed), 0)
+    end
+end)
+
+-- Noclip & Hitbox & Godmode Loop
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        if noclipEnabled then
+            for _, p in pairs(char:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
+            end
+        end
+        if godmodeEnabled and char:FindFirstChild("Humanoid") then
+            char.Humanoid.Health = char.Humanoid.MaxHealth
+        end
+    end
+
+    if hitboxEnabled then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                plr.Character.HumanoidRootPart.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                plr.Character.HumanoidRootPart.Transparency = 0.7
+            end
+        end
+    end
+end)
+
+-- Anti-Void Loop
+RunService.Heartbeat:Connect(function()
+    if antiVoidEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        if LocalPlayer.Character.HumanoidRootPart.Position.Y < -50 then
+            local spawn = workspace:FindFirstChild("SpawnLocation")
+            if spawn then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0, 3, 0)
+            end
+        end
+    end
+end)
+
+-- Anti-Fall
+RunService.Heartbeat:Connect(function()
+    if antiFallEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = LocalPlayer.Character.Humanoid
+        if hum:GetState() == Enum.HumanoidStateType.FallingDown then
+            hum:ChangeState(Enum.HumanoidStateType.Landed)
+        end
+    end
+end)
+
+-- AutoClicker Loop
+task.spawn(function()
+    while true do
+        task.wait(autoClickerDelay / 1000)
+        if autoClickerEnabled and mouse1click then mouse1click() end
+    end
+end)
+
+-- Chat Spam Loop
+task.spawn(function()
+    while true do
+        task.wait(chatSpamDelay)
+        if chatSpamEnabled then
+            local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            if chatEvents and chatEvents:FindFirstChild("SayMessageRequest") then
+                chatEvents.SayMessageRequest:FireServer(chatSpamMessage, "All")
+            end
+        end
+    end
+end)
+
+-- Anti-AFK Loop
+local vu = game:GetService("VirtualUser")
+LocalPlayer.Idled:Connect(function()
+    if antiAFKEnabled then
+        vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end
+end)
+
+-- Infinite Jump
+UserInputService.JumpRequest:Connect(function()
+    if infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- ADVANCED DRAWING ESP ENGINE
+local PURPLE = Color3.fromRGB(180, 0, 255)
+
+RunService.RenderStepped:Connect(function()
+    for i = #espLines, 1, -1 do espLines[i]:Remove() espLines[i] = nil end
+    for i = #tracerLines, 1, -1 do tracerLines[i]:Remove() tracerLines[i] = nil end
+    for i = #textDrawings, 1, -1 do textDrawings[i]:Remove() textDrawings[i] = nil end
+
+    if not (espBoxEnabled or espTracerEnabled or espNamesEnabled or espDistanceEnabled) then return end
+
+    local camPos = Camera.CFrame.Position
+    local viewport = Camera.ViewportSize
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") and plr.Character:FindFirstChild("Humanoid") then
+            local head = plr.Character.Head
+            local hum = plr.Character.Humanoid
+            local pos, onScreen = Camera:WorldToScreenPoint(head.Position)
+
+            if onScreen then    
+                local dist = math.floor((head.Position - camPos).Magnitude)    
+                local size = math.clamp(100 / dist * 10, 15, 45)    
+
+                if espBoxEnabled then    
+                    local lines = { Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line"), Drawing.new("Line") }    
+                    local x, y = pos.X - size/2, pos.Y - size/2    
+                    lines[1].From = Vector2.new(x, y) lines[1].To = Vector2.new(x + size, y)    
+                    lines[2].From = Vector2.new(x + size, y) lines[2].To = Vector2.new(x + size, y + size)    
+                    lines[3].From = Vector2.new(x + size, y + size) lines[3].To = Vector2.new(x, y + size)    
+                    lines[4].From = Vector2.new(x, y + size) lines[4].To = Vector2.new(x, y)    
+
+                    for j = 1, 4 do    
+                        lines[j].Color = PURPLE    
+                        lines[j].Thickness = 2    
+                        lines[j].Transparency = 1    
+                        lines[j].Visible = true    
+                        espLines[#espLines + 1] = lines[j]    
+                    end    
+                end    
+
+                if espTracerEnabled then    
+                    local tracer = Drawing.new("Line")    
+                    tracer.From = Vector2.new(viewport.X / 2, viewport.Y)    
+                    tracer.To = Vector2.new(pos.X, pos.Y)    
+                    tracer.Color = PURPLE    
+                    tracer.Thickness = 1.5    
+                    tracer.Transparency = 0.7    
+                    tracer.Visible = true    
+                    tracerLines[#tracerLines + 1] = tracer    
+                end    
+
+                if espNamesEnabled or espDistanceEnabled then    
+                    local text = Drawing.new("Text")    
+                    text.Position = Vector2.new(pos.X, pos.Y - size/2 - 15)    
+                    text.Size = 13    
+                    text.Center = true    
+                    text.Outline = true    
+                    text.Color = Color3.fromRGB(255, 255, 255)    
+
+                    local content = ""    
+                    if espNamesEnabled then content = content .. plr.Name .. " " end    
+                    if espHealthEnabled then content = content .. "[" .. math.floor(hum.Health) .. "HP] " end    
+                    if espDistanceEnabled then content = content .. "(" .. dist .. "m)" end    
+
+                    text.Text = content    
+                    text.Visible = true    
+                    textDrawings[#textDrawings + 1] = text    
+                end    
+            end    
+        end
+    end
+end)
+
+-- Wallhack Auto-Apply Loop
+RunService.Heartbeat:Connect(function()
+    if wallhackEnabled then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and not plr.Character:FindFirstChild("WIA_WH") then
+                local hl = Instance.new("Highlight")
+                hl.Name = "WIA_WH"
+                hl.FillColor = Color3.fromRGB(180, 0, 255)
+                hl.FillTransparency = 0.3
+                hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                hl.Parent = plr.Character
+            end
+        end
+    end
+end)
+
+-- ================================================================= --
+-- MM2 CORE ENGINE & BACKGROUND LOOPS
+-- ================================================================= --
+
 local function getPlayerRole(player)
     if not player or not player.Character then return "Innocent" end
     local char = player.Character
     local bp = player:FindFirstChild("Backpack")
 
-    if char:FindFirstChild("Knife") or (bp and bp:FindFirstChild("Knife")) then
-        return "Murderer"
-    elseif char:FindFirstChild("Gun") or (bp and bp:FindFirstChild("Gun")) or char:FindFirstChild("Revolver") or (bp and bp:FindFirstChild("Revolver")) then
-        return "Sheriff"
-    end
+    if char:FindFirstChild("Knife") or (bp and bp:FindFirstChild("Knife")) then  
+        return "Murderer"  
+    elseif char:FindFirstChild("Gun") or (bp and bp:FindFirstChild("Gun")) or char:FindFirstChild("Revolver") or (bp and bp:FindFirstChild("Revolver")) then  
+        return "Sheriff"  
+    end  
     return "Innocent"
 end
 
 -- 1. ЦВЕТНОЙ ROLE ESP & GUN ESP
 task.spawn(function()
     while task.wait(0.4) do
-        -- Role ESP
         if RoleESPEnabled then
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character then
                     local role = getPlayerRole(p)
                     local color = nil
-                    
-                    if role == "Murderer" then 
-                        color = Color3.fromRGB(255, 30, 30) 
-                    elseif role == "Sheriff" then 
-                        color = Color3.fromRGB(0, 150, 255) 
-                    end
 
-                    if color then
-                        local hl = p.Character:FindFirstChild("MM2RoleHighlight")
-                        if not hl then
-                            hl = Instance.new("Highlight")
-                            hl.Name = "MM2RoleHighlight"
-                            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                            hl.Parent = p.Character
-                        end
-                        hl.FillColor = color
-                        hl.OutlineColor = color
-                        hl.FillTransparency = 0.4
-                    else
-                        if p.Character:FindFirstChild("MM2RoleHighlight") then 
-                            p.Character.MM2RoleHighlight:Destroy() 
-                        end
-                    end
-                end
-            end
-        end
+                    if role == "Murderer" then   
+                        color = Color3.fromRGB(255, 30, 30)   
+                    elseif role == "Sheriff" then   
+                        color = Color3.fromRGB(0, 150, 255)   
+                    end  
 
-        -- Gun Drop ESP
-        if GunDropESPEnabled then
-            local gunDrop = getGunDrop()
-            if gunDrop then
-                local hl = gunDrop:FindFirstChild("GunHighlight")
-                if not hl then
-                    hl = Instance.new("Highlight")
-                    hl.Name = "GunHighlight"
-                    hl.FillColor = Color3.fromRGB(255, 255, 0)
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    hl.Parent = gunDrop
-                end
-            end
-        end
+                    if color then  
+                        local hl = p.Character:FindFirstChild("MM2RoleHighlight")  
+                        if not hl then  
+                            hl = Instance.new("Highlight")  
+                            hl.Name = "MM2RoleHighlight"  
+                            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop  
+                            hl.Parent = p.Character  
+                        end  
+                        hl.FillColor = color  
+                        hl.OutlineColor = color  
+                        hl.FillTransparency = 0.4  
+                    else  
+                        if p.Character:FindFirstChild("MM2RoleHighlight") then   
+                            p.Character.MM2RoleHighlight:Destroy()   
+                        end  
+                    end  
+                end  
+            end  
+        end  
+
+        if GunDropESPEnabled then  
+            local gunDrop = getGunDrop()  
+            if gunDrop then  
+                local hl = gunDrop:FindFirstChild("GunHighlight")  
+                if not hl then  
+                    hl = Instance.new("Highlight")  
+                    hl.Name = "GunHighlight"  
+                    hl.FillColor = Color3.fromRGB(255, 255, 0)  
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)  
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop  
+                    hl.Parent = gunDrop  
+                end  
+            end  
+        end  
     end
 end)
 
--- 2. ИСПРАВЛЕННЫЙ AUTO-GRAB GUN
+-- 2. AUTO-GRAB GUN
 task.spawn(function()
     while task.wait(0.1) do
         if AutoGrabGun then
@@ -1229,55 +1201,51 @@ task.spawn(function()
             local char = LocalPlayer.Character
             if gunDrop and char and char:FindFirstChild("HumanoidRootPart") then
                 local hrp = char.HumanoidRootPart
-                local gunPart = gunDrop:IsA("Model") and (gunDrop.PrimaryPart or gunDrop:FindFirstChildWhichIsA("BasePart")) or gunDrop
+                local gunPart = gunDrop:IsA("Model") and (gunDrop.PrimaryPart or gunDrop:FindFirstChildWhichIsA("BasePart")) or (gunDrop:IsA("BasePart") and gunDrop or nil)
 
-                if gunPart and gunPart:IsA("BasePart") then
-                    -- Метод 1: Симуляция касания (Touch)
-                    if firetouchinterest then
-                        pcall(function()
-                            firetouchinterest(hrp, gunPart, 0)
-                            task.wait()
-                            firetouchinterest(hrp, gunPart, 1)
-                        end)
-                    end
-                    -- Метод 2: Микро-телепорт на пистолет
-                    pcall(function()
-                        hrp.CFrame = gunPart.CFrame + Vector3.new(0, 0.5, 0)
-                    end)
-                end
-            end
-        end
+                if gunPart then  
+                    if firetouchinterest then  
+                        pcall(function()  
+                            firetouchinterest(hrp, gunPart, 0)  
+                            task.wait()  
+                            firetouchinterest(hrp, gunPart, 1)  
+                        end)  
+                    end  
+                    pcall(function()  
+                        hrp.CFrame = gunPart.CFrame + Vector3.new(0, 0.5, 0)  
+                    end)  
+                end  
+            end  
+        end  
     end
 end)
 
--- 3. АВТО-ФАРМ МОНЕТ (SAFE AUTO-FARM)
+-- 3. АВТО-ФАРМ МОНЕТ
 task.spawn(function()
     while task.wait(0.2) do
         if AutoFarmCoins then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
-                -- Поиск контейнера с монетами
-                local coinsContainer = workspace:FindFirstChild("Normal") and workspace.Normal:FindFirstChild("CoinContainer") or workspace:FindFirstChild("CoinContainer")
-                
-                if coinsContainer then
-                    for _, coin in pairs(coinsContainer:GetChildren()) do
-                        if not AutoFarmCoins then break end
-                        if coin:IsA("BasePart") or coin:IsA("Model") then
-                            local part = coin:IsA("Model") and coin.PrimaryPart or coin
-                            if part and coin.Transparency < 0.9 then
-                                -- Телепорт к монете
-                                char.HumanoidRootPart.CFrame = part.CFrame
-                                task.wait(1 / AutoFarmSpeed)
-                            end
-                        end
-                    end
-                end
-            end
-        end
+                local coinsContainer = (workspace:FindFirstChild("Normal") and workspace.Normal:FindFirstChild("CoinContainer")) or workspace:FindFirstChild("CoinContainer")
+
+                if coinsContainer then  
+                    for _, coin in pairs(coinsContainer:GetChildren()) do  
+                        if not AutoFarmCoins then break end  
+                        if coin:IsA("BasePart") or coin:IsA("Model") then  
+                            local part = coin:IsA("Model") and coin.PrimaryPart or coin  
+                            if part and coin.Transparency < 0.9 then  
+                                char.HumanoidRootPart.CFrame = part.CFrame  
+                                task.wait(1 / AutoFarmSpeed)  
+                            end  
+                        end  
+                    end  
+                end  
+            end  
+        end  
     end
 end)
 
--- 4. ANTI-KNIFE (АВТО-УКЛОНЕНИЕ ОТ МАРДЕРА)
+-- 4. ANTI-KNIFE
 RunService.Heartbeat:Connect(function()
     if AntiKnifeEnabled then
         local char = LocalPlayer.Character
@@ -1286,97 +1254,97 @@ RunService.Heartbeat:Connect(function()
                 if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     local mHrp = p.Character.HumanoidRootPart
                     local dist = (char.HumanoidRootPart.Position - mHrp.Position).Magnitude
-                    
-                    -- Если мардер ближе 15 студов - отпрыгиваем назад
-                    if dist < 15 then
-                        local escapeDir = (char.HumanoidRootPart.Position - mHrp.Position).Unit
-                        char.HumanoidRootPart.CFrame = CFrame.new(char.HumanoidRootPart.Position + escapeDir * 10)
-                    end
-                end
-            end
-        end
+
+                    if dist < 15 then  
+                        local escapeDir = (char.HumanoidRootPart.Position - mHrp.Position).Unit  
+                        char.HumanoidRootPart.CFrame = CFrame.new(char.HumanoidRootPart.Position + escapeDir * 10)  
+                    end  
+                end  
+            end  
+        end  
     end
 end)
 
--- 5. БОЕВОЙ ЦИКЛ: AIM LOCK, AUTO SHOOT, KILL AURA
+-- 5. БОЕВОЙ ЦИКЛ MM2
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
-    -- Поиск Мардера
-    local murdererChar = nil
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character then
-            murdererChar = p.Character
-            break
-        end
-    end
+    local murdererChar = nil  
+    for _, p in pairs(Players:GetPlayers()) do  
+        if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character then  
+            murdererChar = p.Character  
+            break  
+        end  
+    end  
 
-    -- Aim Lock
-    if SilentAimMM2 and murdererChar and murdererChar:FindFirstChild("Head") then
-        local hasGun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")
-        if hasGun then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, murdererChar.Head.Position)
-        end
-    end
+    if SilentAimMM2 and murdererChar and murdererChar:FindFirstChild("Head") then  
+        local hasGun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")  
+        if hasGun then  
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, murdererChar.Head.Position)  
+        end  
+    end  
 
-    -- Auto Shoot
-    if AutoShootEnabled and murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") then
-        local hasGun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")
-        if hasGun then
-            local dist = (char.HumanoidRootPart.Position - murdererChar.HumanoidRootPart.Position).Magnitude
-            if dist < 60 then
-                if mouse1click then mouse1click() end
-            end
-        end
-    end
+    if AutoShootEnabled and murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") then  
+        local hasGun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")  
+        if hasGun then  
+            local dist = (char.HumanoidRootPart.Position - murdererChar.HumanoidRootPart.Position).Magnitude  
+            if dist < 60 and mouse1click then  
+                mouse1click()  
+            end  
+        end  
+    end  
 
-    -- Kill Aura (Для Мардера)
-    if KillAuraEnabled then
-        local knife = char:FindFirstChild("Knife")
-        if knife then
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (char.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                    if dist < 12 then
-                        if knife:FindFirstChild("Stab") then knife.Stab:FireServer() end
-                        if mouse1click then mouse1click() end
-                    end
-                end
-            end
-        end
+    if KillAuraEnabled then  
+        local knife = char:FindFirstChild("Knife")  
+        if knife then  
+            for _, p in pairs(Players:GetPlayers()) do  
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then  
+                    local dist = (char.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude  
+                    if dist < 12 then  
+                        if knife:FindFirstChild("Stab") then knife.Stab:FireServer() end  
+                        if mouse1click then mouse1click() end  
+                    end  
+                end  
+            end  
+        end  
     end
 end)
 
--- ================================================================= --
--- METATABLE HOOK: TRUE SILENT AIM (ПЕРЕХВАТ ВЫСТРЕЛА)
--- ================================================================= --
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
+-- METATABLE HOOK: TRUE SILENT AIM
+local mt = getrawmetatable and getrawmetatable(game)
+if mt then
+    local oldNamecall = mt.__namecall
+    if setreadonly then setreadonly(mt, false) end
 
-if setreadonly then setreadonly(mt, false) end
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod and getnamecallmethod()
+        local args = {...}
 
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
+        if TrueSilentAimMM2 and tostring(self) == "ShootGun" and method == "InvokeServer" then  
+            local murdererChar = nil  
+            for _, p in pairs(Players:GetPlayers()) do  
+                if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then  
+                    murdererChar = p.Character  
+                    break  
+                end  
+            end  
 
-    if TrueSilentAimMM2 and tostring(self) == "ShootGun" and method == "InvokeServer" then
-        local murdererChar = nil
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                murdererChar = p.Character
-                break
-            end
-        end
+            if murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") then  
+                args[1] = murdererChar.HumanoidRootPart.Position + (murdererChar.HumanoidRootPart.Velocity * 0.05)  
+                return oldNamecall(self, unpack(args))  
+            end  
+        end  
 
-        if murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") then
-            -- Перенаправляем вектор выстрела прямо в Мардера с учетом его движения
-            args[1] = murdererChar.HumanoidRootPart.Position + (murdererChar.HumanoidRootPart.Velocity * 0.05)
-            return oldNamecall(self, unpack(args))
-        end
-    end
+        return oldNamecall(self, ...)
+    end)
 
-    return oldNamecall(self, ...)
-end)
+    if setreadonly then setreadonly(mt, true) end
+end
 
-if setreadonly then setreadonly(mt, true) end
+Rayfield:Notify({
+    Title = "WIA HUB v8.0",
+    Content = "Успешно загружено!",
+    Duration = 4,
+    Image = 0,
+})
