@@ -1,6 +1,6 @@
 -- ================================================================= --
 -- WIA HUB v12.6 :: MM2 ULTIMATE & INFINITY YIELD HYBRID
--- FINAL POLISH | OPTIMIZED | CLEAN ARCHITECTURE | FIXED EVENTS
+-- FINAL POLISH | OPTIMIZED | CLEAN ARCHITECTURE | FIXED ALL ERRORS
 -- ================================================================= --
 
 local Players = game:GetService("Players")
@@ -82,24 +82,20 @@ local OriginalLighting = {
     OutdoorAmbient = Lighting.OutdoorAmbient,
 }
 
--- Кэш контейнеров монет
 local CoinContainerCache = {
     Containers = {},
     Timestamp = 0,
     UpdateInterval = 2,
 }
 
--- Кэш монет
 local CoinCache = {
     Coins = {},
     Timestamp = 0,
     UpdateInterval = 0.5,
 }
 
--- Сохранение исходных CanCollide для Noclip
 local OriginalCollision = {}
 
--- ESP кэш
 local ESPCache = {
     PlayerHighlights = {},
     CoinHighlights = {},
@@ -109,14 +105,12 @@ local ESPCache = {
     PlayerBackpackConnections = {},
 }
 
--- Полёт
 local FlyData = {
     BodyVelocity = nil,
     BodyGyro = nil,
     Active = false,
 }
 
--- ========== STATE FOR UTILITIES ==========
 local UtilityState = {
     TeleportTool = nil,
     SelectedPlayer = nil,
@@ -130,8 +124,6 @@ local UtilityState = {
 }
 
 local UtilityObjects = {}
-
--- Переменная для сохранения экземпляра Orion
 local OrionLib = nil
 
 -- ========== 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -150,7 +142,6 @@ local function SafeGetCamera()
     return Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera")
 end
 
--- Кэшированный поиск контейнеров монет
 local function GetCoinContainers()
     local now = tick()
     if now - CoinContainerCache.Timestamp < CoinContainerCache.UpdateInterval then
@@ -751,15 +742,22 @@ local function SetupTriggers()
         local function setupBackpackConnections()
             cleanupBackpackConnections()
 
-            if plr:FindFirstChild("Backpack") then
+            local bp = plr:FindFirstChild("Backpack")
+            if bp then
                 local newConnections = {}
-                table.insert(newConnections, TrackConnection(plr.Backpack.ChildAdded:Connect(checkBackpackChange)))
-                table.insert(newConnections, TrackConnection(plr.Backpack.ChildRemoved:Connect(checkBackpackChange)))
+                table.insert(newConnections, TrackConnection(bp.ChildAdded:Connect(checkBackpackChange)))
+                table.insert(newConnections, TrackConnection(bp.ChildRemoved:Connect(checkBackpackChange)))
                 ESPCache.PlayerBackpackConnections[plr] = newConnections
             end
         end
 
-        TrackConnection(plr:GetPropertyChangedSignal("Backpack"):Connect(setupBackpackConnections))
+        -- Отслеживаем создание Backpack через ChildAdded
+        TrackConnection(plr.ChildAdded:Connect(function(child)
+            if child.Name == "Backpack" then
+                setupBackpackConnections()
+            end
+        end))
+
         setupBackpackConnections()
     end
 
@@ -1353,7 +1351,6 @@ TabIYUtils:AddButton({
     end
 })
 
--- Инициализация Orion GUI
 OrionLib:Init()
 
 task.wait(0.5)
@@ -1550,7 +1547,7 @@ TrackConnection(RunService.RenderStepped:Connect(function()
     end
 end))
 
--- Обновление ESP
+-- ESP Loop
 local lastESPUpdate = 0
 TrackConnection(RunService.Heartbeat:Connect(function()
     local now = tick()
@@ -1571,7 +1568,7 @@ TrackConnection(RunService.Heartbeat:Connect(function()
     end
 end))
 
--- Spectate мониторинг
+-- Spectate loop
 TrackConnection(RunService.Heartbeat:Connect(function()
     if UtilityState.IsSpectating and UtilityState.SpectateTarget then
         local target = UtilityState.SpectateTarget
@@ -1594,7 +1591,7 @@ TrackConnection(RunService.Heartbeat:Connect(function()
     end
 end))
 
--- Очистка при выходе
+-- Cleanup on exit
 TrackConnection(LocalPlayer:GetPropertyChangedSignal("Parent"):Connect(function()
     if not LocalPlayer.Parent then
         SafeCleanup()
@@ -1609,4 +1606,4 @@ ApplyMovementSettings()
 UpdateAllESP()
 RefreshPlayerList()
 
-Notify("WIA HUB v12.6", "Скрипт успешно запущен без ошибок!", 5)
+Notify("WIA HUB v12.6", "Скрипт полностью исправлен и готов к работе!", 5)
