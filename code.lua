@@ -1,8 +1,9 @@
 -- ================================================================= --
--- WIA HUB v8.0 Ultimate Edition :: whitewia / tordark
--- FULL GUI + AIMBOT (WITH VISUAL FOV) + PLAYER LIST + EXTENDED ESP + CFRAME SPEED
--- FIXED: BHOP + TELEPORT TOOL ADDED
+-- WIA HUB v8.0 Ultimate Edition :: whitewia / tordark (Rayfield GUI)
+-- RAYFIELD UI + AIMBOT + SKELETON ESP + PLAYER LIST + EXTENDED ESP + PERSISTENT TP TOOL
 -- ================================================================= --
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,46 +16,43 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
-
--- Safe CoreGui Parent
 local CoreGui = game:GetService("CoreGui")
 
 -- ========== VARIABLE DECLARATIONS ==========
-local flightEnabled, noclipEnabled, noclipForceMode = false, false, false
+local flightEnabled, noclipEnabled = false, false
 local flySpeed = 50
-local bodyVelocity, bodyGyro, noclipConnection, noclipForceConnection = nil, nil, nil, nil
-local originalCollisions = {}
+local bodyVelocity, bodyGyro = nil, nil
 
-local walkSpeedEnabled, jumpPowerEnabled, cframeSpeedEnabled = false, false, false
 local walkSpeedValue, jumpPowerValue, cframeSpeedValue = 16, 50, 2
+local cframeSpeedEnabled = false
 local infiniteJumpEnabled, bhopEnabled, spinbotEnabled = false, false, false
 local spinbotSpeed = 20
 
-local godmodeEnabled, godmodeConnection, godmodeHealthConnection = false, false, false
+local godmodeEnabled = false
 local tpTool = nil
 local tpEnabled = false
 
-local wallhackEnabled, highlightConnections, whHighlights = false, {}, {}
-local antiAFKEnabled, antiAFKConnection = false, nil
+local wallhackEnabled = false
+local antiAFKEnabled = false
 local playerListEnabled = false
-local antiVoidEnabled, antiVoidConnection = false, nil
+local antiVoidEnabled = false
 local fullBrightEnabled, noFogEnabled = false, false
 local originalBrightness, originalAmbient, originalFog = nil, nil, nil
 
-local fovEnabled, fovValue, originalFOV = false, 90, 70
-local hitboxEnabled, hitboxConnection, hitboxSize = false, nil, 5
-local autoClickerEnabled, autoClickerDelay, autoClickerConnection = false, 100, nil
-local triggerbotEnabled, triggerbotConnection = false, nil
-
-local chatSpamEnabled, chatSpamMessage, chatSpamDelay, chatSpamConnection = false, "WIA HUB ON TOP", 5, nil
-local antiFallEnabled, antiFallConnection = false, nil
-
--- Aimbot Variables
-local aimbotEnabled = false
 local aimbotFOV = 90
 local aimbotSmoothness = 5
 local aimbotSelectedTarget = nil
 local fovCircleVisible = true
+
+local hitboxEnabled = false
+local hitboxSize = 5
+local autoClickerEnabled, autoClickerDelay = false, 100
+local triggerbotEnabled = false
+
+local chatSpamEnabled, chatSpamMessage, chatSpamDelay = false, "WIA HUB ON TOP", 5
+local antiFallEnabled = false
+
+local aimbotEnabled = false
 
 -- ESP Extras
 local espBoxEnabled = true
@@ -62,7 +60,8 @@ local espTracerEnabled = true
 local espNamesEnabled = true
 local espDistanceEnabled = true
 local espHealthEnabled = true
-local espLines, tracerLines, textDrawings = {}, {}, {}
+local skeletonEspEnabled = true -- Added Skeleton ESP toggle default
+local espLines, tracerLines, textDrawings, skeletonLines = {}, {}, {}, {}
 
 -- Drawing API FOV Circle
 local fovCircle = nil
@@ -76,79 +75,26 @@ if Drawing then
     fovCircle.Color = Color3.fromRGB(180, 0, 255)
 end
 
--- ========== GUI CREATION ==========
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "WiaHubGUI_v8"
-ScreenGui.Parent = CoreGui
+-- ========== RAYFIELD WINDOW SETUP ==========
+local Window = Rayfield:CreateWindow({
+    Name = "WIA HUB v8.0 Ultimate Edition",
+    LoadingTitle = "WIA HUB Loading...",
+    LoadingSubtitle = "by whitewia / tordark",
+    ConfigurationSaving = {
+        Enabled = false,
+        FolderName = "WiaHubConfig",
+        FileName = "WiaHub"
+    },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 340, 0, 680)
-MainFrame.Position = UDim2.new(0, 10, 0, 10)
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-MainFrame.BackgroundTransparency = 0.25
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Parent = ScreenGui
+local CombatTab = Window:CreateTab("Combat & Aim", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals & ESP", 4483345998)
+local MovementTab = Window:CreateTab("Movement", 4483345998)
+local MiscTab = Window:CreateTab("Misc & Utilities", 4483362458)
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Position = UDim2.new(0, 0, 0, 0)
-Title.Text = "WIA HUB v8.0"
-Title.TextColor3 = Color3.fromRGB(180, 0, 255)
-Title.TextScaled = true
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-Title.Parent = MainFrame
-
-local Underline = Instance.new("Frame")
-Underline.Size = UDim2.new(1, -20, 0, 1)
-Underline.Position = UDim2.new(0, 10, 0, 30)
-Underline.BackgroundColor3 = Color3.fromRGB(180, 0, 255)
-Underline.BackgroundTransparency = 0.3
-Underline.Parent = MainFrame
-
-local ScrollingFrame = Instance.new("ScrollingFrame")
-ScrollingFrame.Size = UDim2.new(1, 0, 1, -35)
-ScrollingFrame.Position = UDim2.new(0, 0, 0, 35)
-ScrollingFrame.BackgroundTransparency = 1
-ScrollingFrame.BorderSizePixel = 0
-ScrollingFrame.ScrollBarThickness = 6
-ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 0, 255)
-ScrollingFrame.Parent = MainFrame
-
-local Container = Instance.new("Frame")
-Container.Size = UDim2.new(1, 0, 0, 0)
-Container.BackgroundTransparency = 1
-Container.Parent = ScrollingFrame
-
--- DYNAMIC LAYOUT ENGINE
-local currentYOffset = 5
-local function getNextY(height)
-    local y = currentYOffset
-    currentYOffset = currentYOffset + height + 5
-    return y
-end
-
-local function refreshCanvas()
-    Container.Size = UDim2.new(1, 0, 0, currentYOffset + 20)
-    ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, currentYOffset + 20)
-end
-
--- STATUS BAR
-local StatusBar = Instance.new("TextLabel")
-StatusBar.Size = UDim2.new(1, -20, 0, 25)
-StatusBar.Text = "Ready"
-StatusBar.TextColor3 = Color3.fromRGB(150, 150, 180)
-StatusBar.TextScaled = true
-StatusBar.BackgroundTransparency = 1
-StatusBar.Font = Enum.Font.Gotham
-
-local function setStatus(text, color)
-    StatusBar.Text = text
-    StatusBar.TextColor3 = color or Color3.fromRGB(150, 150, 180)
-end
-
--- PLAYER LIST GUI
+-- ========== PLAYER LIST GUI (NATIVE OVERLAY) ==========
 local PlayerListGui = Instance.new("ScreenGui")
 PlayerListGui.Name = "WiaPlayerList_v8"
 PlayerListGui.Parent = CoreGui
@@ -197,7 +143,7 @@ TargetStatus.Font = Enum.Font.Gotham
 TargetStatus.TextSize = 12
 TargetStatus.Parent = PlayerListMain
 
--- DRAGGABLE ENGINE
+-- Draggable Function for Player List
 local function makeDraggable(frame)
     local dragging, dragStart, startPos = false, nil, nil
     frame.InputBegan:Connect(function(input)
@@ -217,152 +163,57 @@ local function makeDraggable(frame)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
 end
-makeDraggable(MainFrame)
 makeDraggable(PlayerListMain)
 
--- HIDE UI ON LCTRL
-local guiVisible = true
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.LeftControl then
-        guiVisible = not guiVisible
-        ScreenGui.Enabled = guiVisible
-        if playerListEnabled then PlayerListGui.Enabled = guiVisible end
+local function updatePlayerList()
+    for _, btn in pairs(PlayerListContainer:GetChildren()) do
+        btn:Destroy()
     end
-end)
 
--- UI FACTORY FUNCTIONS
-local function createTumbler(labelText, defaultState)
-    local y = getNextY(30)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(0, 300, 0, 30)
-    container.Position = UDim2.new(0, 10, 0, y)
-    container.BackgroundTransparency = 1
-    container.Parent = Container
+    local players = Players:GetPlayers()
+    local y = 0
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 200, 0, 30)
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(255,255,255)
-    label.TextSize = 13
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.Gotham
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
+    for _, plr in pairs(players) do
+        if plr ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 25)
+            btn.Position = UDim2.new(0, 0, 0, y)
+            btn.Text = plr.Name .. "  [TP]  [AIM]"
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+            btn.BackgroundColor3 = (aimbotSelectedTarget == plr) and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40,40,55)
+            btn.BorderSizePixel = 0
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 11
+            btn.Parent = PlayerListContainer
 
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(0, 50, 0, 22)
-    bg.Position = UDim2.new(0, 230, 0, 4)
-    bg.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-    bg.BorderSizePixel = 0
-    bg.Parent = container
+            btn.MouseButton1Click:Connect(function()
+                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                end
+            end)
 
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 18, 0, 18)
-    knob.Position = UDim2.new(0, 2, 0, 2)
-    knob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-    knob.BorderSizePixel = 0
-    knob.Parent = bg
+            btn.MouseButton2Click:Connect(function()
+                if aimbotSelectedTarget == plr then
+                    aimbotSelectedTarget = nil
+                    TargetStatus.Text = "Target: Auto (Closest)"
+                    TargetStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
+                else
+                    aimbotSelectedTarget = plr
+                    TargetStatus.Text = "Target: " .. plr.Name
+                    TargetStatus.TextColor3 = Color3.fromRGB(0, 255, 100)
+                end
+                updatePlayerList()
+            end)
 
-    local state = defaultState or false
-
-    local function updateTumbler()
-        if state then
-            bg.BackgroundColor3 = Color3.fromRGB(180, 0, 255)
-            knob.Position = UDim2.new(0, 30, 0, 2)
-            knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        else
-            bg.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-            knob.Position = UDim2.new(0, 2, 0, 2)
-            knob.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+            y = y + 27
         end
     end
-    updateTumbler()
 
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = ""
-    btn.Parent = container
-
-    local toggleEvent = Instance.new("BindableEvent")
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        updateTumbler()
-        toggleEvent:Fire(state)
-    end)
-
-    return {
-        getState = function() return state end,
-        setState = function(newState)
-            state = newState
-            updateTumbler()
-            toggleEvent:Fire(state)
-        end,
-        onToggle = function(callback) toggleEvent.Event:Connect(callback) end
-    }
+    PlayerListContainer.Size = UDim2.new(1, 0, 0, y)
+    playerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 10)
 end
 
-local function createSlider(labelText, minVal, maxVal, defaultVal, callback)
-    local y = getNextY(30)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(0, 300, 0, 30)
-    container.Position = UDim2.new(0, 10, 0, y)
-    container.BackgroundTransparency = 1
-    container.Parent = Container
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 200, 0, 30)
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(255,255,255)
-    label.TextSize = 13
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.Gotham
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
-
-    local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(0, 50, 0, 22)
-    textBox.Position = UDim2.new(0, 230, 0, 4)
-    textBox.Text = tostring(defaultVal)
-    textBox.TextColor3 = Color3.fromRGB(255,255,255)
-    textBox.BackgroundColor3 = Color3.fromRGB(40,40,55)
-    textBox.BorderSizePixel = 0
-    textBox.Font = Enum.Font.Gotham
-    textBox.TextSize = 12
-    textBox.Parent = container
-
-    textBox.FocusLost:Connect(function()
-        local num = tonumber(textBox.Text)
-        if num and num >= minVal and num <= maxVal then
-            callback(num)
-            textBox.Text = tostring(num)
-        else
-            textBox.Text = tostring(defaultVal)
-            callback(defaultVal)
-        end
-    end)
-
-    return { setValue = function(val) textBox.Text = tostring(val) end }
-end
-
-local function createButton(labelText, callback)
-    local y = getNextY(30)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 280, 0, 26)
-    btn.Position = UDim2.new(0, 10, 0, y)
-    btn.Text = labelText
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
-    btn.BackgroundColor3 = Color3.fromRGB(50, 30, 80)
-    btn.BorderSizePixel = 0
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
-    btn.Parent = Container
-
-    btn.MouseButton1Click:Connect(callback)
-    return btn
-end
-
--- ========== TELEPORT TOOL FUNCTIONS ==========
+-- ========== TELEPORT TOOL FUNCTIONS (PERSISTENT AFTER DEATH) ==========
 local function createTPTool()
     local tool = Instance.new("Tool")
     tool.Name = "WIA_TP"
@@ -393,13 +244,11 @@ local function createTPTool()
     tool.Equipped:Connect(function()
         tpEnabled = true
         Mouse.Icon = "rbxasset://SystemCursors/Crosshair"
-        setStatus("TP Ready - Click to teleport", Color3.fromRGB(0,255,150))
     end)
 
     tool.Unequipped:Connect(function()
         tpEnabled = false
         Mouse.Icon = "rbxasset://SystemCursors/Arrow"
-        setStatus("TP Off")
     end)
 
     tool.Activated:Connect(function()
@@ -411,57 +260,412 @@ local function createTPTool()
     return tool
 end
 
--- ========== PLAYER LIST FUNCTIONS ==========
-local function updatePlayerList()
-    for _, btn in pairs(PlayerListContainer:GetChildren()) do
-        btn:Destroy()
+local function giveTPTool()
+    if not tpTool then
+        tpTool = createTPTool()
     end
+    tpTool.Parent = LocalPlayer.Backpack
+end
 
-    local players = Players:GetPlayers()
-    local y = 0
-
-    for _, plr in pairs(players) do
-        if plr ~= LocalPlayer then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, 0, 0, 25)
-            btn.Position = UDim2.new(0, 0, 0, y)
-            btn.Text = plr.Name .. "  [TP]  [AIM]"
-            btn.TextColor3 = Color3.fromRGB(255,255,255)
-            btn.BackgroundColor3 = (aimbotSelectedTarget == plr) and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40,40,55)
-            btn.BorderSizePixel = 0
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 11
-            btn.Parent = PlayerListContainer
-
-            -- TP (Left Click)
-            btn.MouseButton1Click:Connect(function()
-                if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-                    setStatus("Teleported to " .. plr.Name, Color3.fromRGB(0,255,150))
-                end
-            end)
-
-            -- AIM TARGET (Right Click)
-            btn.MouseButton2Click:Connect(function()
-                if aimbotSelectedTarget == plr then
-                    aimbotSelectedTarget = nil
-                    TargetStatus.Text = "Target: Auto (Closest)"
-                    TargetStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
-                else
-                    aimbotSelectedTarget = plr
-                    TargetStatus.Text = "Target: " .. plr.Name
-                    TargetStatus.TextColor3 = Color3.fromRGB(0, 255, 100)
-                end
-                updatePlayerList()
-            end)
-
-            y = y + 27
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if tpToolActive then
+        task.wait(1)
+        giveTPTool()
+        if char:FindFirstChild("Humanoid") then
+            char.Humanoid:EquipTool(tpTool)
         end
     end
+end)
 
-    PlayerListContainer.Size = UDim2.new(1, 0, 0, y)
-    playerListScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y + 10)
-end
+-- ========== COMBAT TAB CONTROLS ==========
+CombatTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Callback = function(Value)
+        aimbotEnabled = Value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Aimbot FOV Circle",
+    CurrentValue = true,
+    Callback = function(Value)
+        fovCircleVisible = Value
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Aimbot FOV",
+    Range = {10, 400},
+    Increment = 5,
+    CurrentValue = 90,
+    Callback = function(Value)
+        aimbotFOV = Value
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Aimbot Smoothness",
+    Range = {1, 20},
+    Increment = 1,
+    CurrentValue = 5,
+    Callback = function(Value)
+        aimbotSmoothness = Value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Triggerbot (AutoShot)",
+    CurrentValue = false,
+    Callback = function(Value)
+        triggerbotEnabled = Value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Callback = function(Value)
+        hitboxEnabled = Value
+        if not Value then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    plr.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
+                end
+            end
+        end
+    end,
+})
+
+CombatTab:CreateSlider({
+    Name = "Hitbox Size",
+    Range = {2, 20},
+    Increment = 1,
+    CurrentValue = 5,
+    Callback = function(Value)
+        hitboxSize = Value
+    end,
+})
+
+-- ========== VISUALS TAB CONTROLS ==========
+VisualsTab:CreateToggle({
+    Name = "ESP Boxes",
+    CurrentValue = true,
+    Callback = function(Value)
+        espBoxEnabled = Value
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Tracers",
+    CurrentValue = true,
+    Callback = function(Value)
+        espTracerEnabled = Value
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Names",
+    CurrentValue = true,
+    Callback = function(Value)
+        espNamesEnabled = Value
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Distance & Health",
+    CurrentValue = true,
+    Callback = function(Value)
+        espDistanceEnabled = Value
+        espHealthEnabled = Value
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Skeleton ESP",
+    CurrentValue = true,
+    Callback = function(Value)
+        skeletonEspEnabled = Value
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "Wallhack (Highlight)",
+    CurrentValue = false,
+    Callback = function(Value)
+        wallhackEnabled = Value
+        if not Value then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr.Character and plr.Character:FindFirstChild("WIA_WH") then
+                    plr.Character.WIA_WH:Destroy()
+                end
+            end
+        end
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "FullBright",
+    CurrentValue = false,
+    Callback = function(Value)
+        fullBrightEnabled = Value
+        if Value then
+            originalBrightness = Lighting.Brightness
+            originalAmbient = Lighting.Ambient
+            Lighting.Brightness = 2
+            Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        else
+            if originalBrightness then Lighting.Brightness = originalBrightness end
+            if originalAmbient then Lighting.Ambient = originalAmbient end
+        end
+    end,
+})
+
+VisualsTab:CreateToggle({
+    Name = "No Fog (FPS Boost)",
+    CurrentValue = false,
+    Callback = function(Value)
+        noFogEnabled = Value
+        if Value then
+            originalFog = Lighting.FogEnd
+            Lighting.FogEnd = 1e6
+        else
+            if originalFog then Lighting.FogEnd = originalFog end
+        end
+    end,
+})
+
+VisualsTab:CreateSlider({
+    Name = "Camera FOV",
+    Range = {50, 120},
+    Increment = 1,
+    CurrentValue = 70,
+    Callback = function(Value)
+        Camera.FieldOfView = Value
+    end,
+})
+
+-- ========== MOVEMENT TAB CONTROLS ==========
+MovementTab:CreateToggle({
+    Name = "Flight",
+    CurrentValue = false,
+    Callback = function(Value)
+        flightEnabled = Value
+        if Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            bodyVelocity = Instance.new("BodyVelocity", LocalPlayer.Character.HumanoidRootPart)
+            bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            bodyGyro = Instance.new("BodyGyro", LocalPlayer.Character.HumanoidRootPart)
+            bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+        else
+            if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+            if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+        end
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {10, 300},
+    Increment = 5,
+    CurrentValue = 50,
+    Callback = function(Value)
+        flySpeed = Value
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(Value)
+        noclipEnabled = Value
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "CFrame Speed (Bypass)",
+    CurrentValue = false,
+    Callback = function(Value)
+        cframeSpeedEnabled = Value
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "CFrame Speed Multiplier",
+    Range = {1, 10},
+    Increment = 0.5,
+    CurrentValue = 2,
+    Callback = function(Value)
+        cframeSpeedValue = Value
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 200},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(Value)
+        walkSpeedValue = Value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 200},
+    Increment = 5,
+    CurrentValue = 50,
+    Callback = function(Value)
+        jumpPowerValue = Value
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.JumpPower = Value
+        end
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Callback = function(Value)
+        infiniteJumpEnabled = Value
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Bhop (FIXED)",
+    CurrentValue = false,
+    Callback = function(Value)
+        bhopEnabled = Value
+    end,
+})
+
+MovementTab:CreateToggle({
+    Name = "Spinbot",
+    CurrentValue = false,
+    Callback = function(Value)
+        spinbotEnabled = Value
+    end,
+})
+
+MovementTab:CreateSlider({
+    Name = "Spinbot Speed",
+    Range = {5, 50},
+    Increment = 1,
+    CurrentValue = 20,
+    Callback = function(Value)
+        spinbotSpeed = Value
+    end,
+})
+
+-- ========== MISC & UTILITIES TAB CONTROLS ==========
+MiscTab:CreateToggle({
+    Name = "Godmode",
+    CurrentValue = false,
+    Callback = function(Value)
+        godmodeEnabled = Value
+        if Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.Health = LocalPlayer.Character.Humanoid.MaxHealth
+        end
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Anti-Void",
+    CurrentValue = false,
+    Callback = function(Value)
+        antiVoidEnabled = Value
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Anti-Fall Damage",
+    CurrentValue = false,
+    Callback = function(Value)
+        antiFallEnabled = Value
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Anti-AFK",
+    CurrentValue = false,
+    Callback = function(Value)
+        antiAFKEnabled = Value
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Player List GUI",
+    CurrentValue = false,
+    Callback = function(Value)
+        playerListEnabled = Value
+        PlayerListGui.Enabled = Value
+        if Value then updatePlayerList() end
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Teleport Tool (Persistent)",
+    CurrentValue = false,
+    Callback = function(Value)
+        tpToolActive = Value
+        if Value then
+            giveTPTool()
+        else
+            if tpTool then
+                tpTool:Destroy()
+                tpTool = nil
+            end
+        end
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "AutoClicker",
+    CurrentValue = false,
+    Callback = function(Value)
+        autoClickerEnabled = Value
+    end,
+})
+
+MiscTab:CreateSlider({
+    Name = "Click Delay (ms)",
+    Range = {10, 1000},
+    Increment = 10,
+    CurrentValue = 100,
+    Callback = function(Value)
+        autoClickerDelay = Value
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name = "Chat Spam",
+    CurrentValue = false,
+    Callback = function(Value)
+        chatSpamEnabled = Value
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Rejoin Server",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end,
+})
+
+MiscTab:CreateButton({
+    Name = "Server Hop",
+    Callback = function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+        for _, s in pairs(servers) do
+            if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                break
+            end
+        end
+    end,
+})
 
 -- ========== AIMBOT ENGINE ==========
 local function getAimbotTarget()
@@ -488,14 +692,12 @@ local function getAimbotTarget()
 end
 
 RunService.RenderStepped:Connect(function()
-    -- FOV Circle Position Update
     if fovCircle then
         fovCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
         fovCircle.Radius = aimbotFOV
         fovCircle.Visible = aimbotEnabled and fovCircleVisible
     end
 
-    -- Aimbot Loop
     if aimbotEnabled then
         local target = getAimbotTarget()
         if target and target.Character and target.Character:FindFirstChild("Head") then
@@ -525,170 +727,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
--- ========== CREATING ALL TOGGLES & SLIDERS ==========
-
--- COMBAT & AIM
-createTumbler("Aimbot", false).onToggle(function(st) aimbotEnabled = st setStatus(st and "Aimbot ON" or "Aimbot OFF") end)
-createTumbler("Aimbot FOV Circle", true).onToggle(function(st) fovCircleVisible = st end)
-createSlider("Aimbot FOV", 10, 400, 90, function(val) aimbotFOV = val end)
-createSlider("Aimbot Smooth", 1, 20, 5, function(val) aimbotSmoothness = val end)
-createTumbler("Triggerbot (AutoShot)", false).onToggle(function(st) triggerbotEnabled = st end)
-createTumbler("Hitbox Expander", false).onToggle(function(st)
-    hitboxEnabled = st
-    if not st then
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                plr.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 1)
-            end
-        end
-    end
-end)
-createSlider("Hitbox Size", 2, 20, 5, function(val) hitboxSize = val end)
-
--- ESP & VISUALS
-createTumbler("ESP Boxes", true).onToggle(function(st) espBoxEnabled = st end)
-createTumbler("ESP Tracers", true).onToggle(function(st) espTracerEnabled = st end)
-createTumbler("ESP Names", true).onToggle(function(st) espNamesEnabled = st end)
-createTumbler("ESP Distance & HP", true).onToggle(function(st) espDistanceEnabled = st espHealthEnabled = st end)
-createTumbler("Wallhack (Highlight)", false).onToggle(function(st)
-    wallhackEnabled = st
-    if not st then
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr.Character and plr.Character:FindFirstChild("WIA_WH") then
-                plr.Character.WIA_WH:Destroy()
-            end
-        end
-    end
-end)
-
--- MOVEMENT & FLIGHT
-createTumbler("Flight", false).onToggle(function(st)
-    flightEnabled = st
-    if st and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        bodyVelocity = Instance.new("BodyVelocity", LocalPlayer.Character.HumanoidRootPart)
-        bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-        bodyGyro = Instance.new("BodyGyro", LocalPlayer.Character.HumanoidRootPart)
-        bodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-    else
-        if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
-        if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
-    end
-end)
-createSlider("Fly Speed", 10, 300, 50, function(val) flySpeed = val end)
-
-createTumbler("Noclip", false).onToggle(function(st) noclipEnabled = st end)
-createTumbler("CFrame Speed (Bypass)", false).onToggle(function(st) cframeSpeedEnabled = st end)
-createSlider("CFrame Speed Multiplier", 1, 10, 2, function(val) cframeSpeedValue = val end)
-
-createSlider("Walk Speed", 16, 200, 16, function(val)
-    walkSpeedValue = val
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = val
-    end
-end)
-
-createSlider("Jump Power", 50, 200, 50, function(val)
-    jumpPowerValue = val
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.JumpPower = val
-    end
-end)
-
-createTumbler("Infinite Jump", false).onToggle(function(st) infiniteJumpEnabled = st end)
-createTumbler("Bhop (FIXED)", false).onToggle(function(st) bhopEnabled = st end)
-createTumbler("Spinbot", false).onToggle(function(st) spinbotEnabled = st end)
-createSlider("Spinbot Speed", 5, 50, 20, function(val) spinbotSpeed = val end)
-
--- PLAYER UTILITIES
-createTumbler("Godmode", false).onToggle(function(st)
-    godmodeEnabled = st
-    if st and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = LocalPlayer.Character.Humanoid.MaxHealth
-    end
-end)
-createTumbler("Anti-Void", false).onToggle(function(st) antiVoidEnabled = st end)
-createTumbler("Anti-Fall Damage", false).onToggle(function(st) antiFallEnabled = st end)
-createTumbler("Anti-AFK", false).onToggle(function(st) antiAFKEnabled = st end)
-createTumbler("Player List GUI", false).onToggle(function(st)
-    playerListEnabled = st
-    PlayerListGui.Enabled = st
-    if st then updatePlayerList() end
-end)
-
--- TELEPORT TOOL
-createTumbler("Teleport Tool", false).onToggle(function(st)
-    if st then
-        if not tpTool then
-            tpTool = createTPTool()
-            tpTool.Parent = LocalPlayer.Backpack
-            setStatus("Teleport Tool added to backpack!", Color3.fromRGB(0,255,150))
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid:EquipTool(tpTool)
-            end
-        end
-    else
-        if tpTool then
-            tpTool:Destroy()
-            tpTool = nil
-        end
-        setStatus("Teleport Tool removed", Color3.fromRGB(255,150,0))
-    end
-end)
-
--- WORLD & RENDER
-createTumbler("FullBright", false).onToggle(function(st)
-    fullBrightEnabled = st
-    if st then
-        originalBrightness = Lighting.Brightness
-        originalAmbient = Lighting.Ambient
-        Lighting.Brightness = 2
-        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-    else
-        if originalBrightness then Lighting.Brightness = originalBrightness end
-        if originalAmbient then Lighting.Ambient = originalAmbient end
-    end
-end)
-
-createTumbler("No Fog (FPS Boost)", false).onToggle(function(st)
-    noFogEnabled = st
-    if st then
-        originalFog = Lighting.FogEnd
-        Lighting.FogEnd = 1e6
-    else
-        if originalFog then Lighting.FogEnd = originalFog end
-    end
-end)
-
-createSlider("Camera FOV", 50, 120, 70, function(val) Camera.FieldOfView = val end)
-
--- AUTOMATION
-createTumbler("AutoClicker", false).onToggle(function(st) autoClickerEnabled = st end)
-createSlider("Click Delay (ms)", 10, 1000, 100, function(val) autoClickerDelay = val end)
-createTumbler("Chat Spam", false).onToggle(function(st) chatSpamEnabled = st end)
-
--- REJOIN & SERVER HOP BUTTONS
-createButton("Rejoin Server", function()
-    TeleportService:Teleport(game.PlaceId, LocalPlayer)
-end)
-
-createButton("Server Hop", function()
-    local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
-    for _, s in pairs(servers) do
-        if s.playing < s.maxPlayers and s.id ~= game.JobId then
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-            break
-        end
-    end
-end)
-
--- Attach status bar at bottom
-local sY = getNextY(25)
-StatusBar.Position = UDim2.new(0, 10, 0, sY)
-StatusBar.Parent = Container
-
-refreshCanvas()
 
 -- ========== GAME LOOPS & HEARTBEAT ==========
 
@@ -724,7 +762,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- BHOP (FIXED)
+-- BHOP Loop
 RunService.Heartbeat:Connect(function()
     if bhopEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local hum = LocalPlayer.Character.Humanoid
@@ -741,7 +779,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Noclip & Hitbox Expander & Godmode Loop
+-- Noclip & Hitbox & Godmode Loop
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if char then
@@ -777,7 +815,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Anti-Fall
+-- Anti-Fall Loop
 RunService.Heartbeat:Connect(function()
     if antiFallEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local hum = LocalPlayer.Character.Humanoid
@@ -810,7 +848,7 @@ task.spawn(function()
     end
 end)
 
--- Anti-AFK Loop
+-- Anti-AFK Connection
 local vu = game:GetService("VirtualUser")
 LocalPlayer.Idled:Connect(function()
     if antiAFKEnabled then
@@ -820,31 +858,32 @@ LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- Infinite Jump
+-- Infinite Jump Request
 UserInputService.JumpRequest:Connect(function()
     if infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
--- ========== ADVANCED DRAWING ESP ENGINE ==========
+-- ========== ADVANCED DRAWING ESP & SKELETON ENGINE ==========
 local PURPLE = Color3.fromRGB(180, 0, 255)
 
 RunService.RenderStepped:Connect(function()
-    -- Clear drawings
     for i = #espLines, 1, -1 do espLines[i]:Remove() espLines[i] = nil end
     for i = #tracerLines, 1, -1 do tracerLines[i]:Remove() tracerLines[i] = nil end
     for i = #textDrawings, 1, -1 do textDrawings[i]:Remove() textDrawings[i] = nil end
+    for i = #skeletonLines, 1, -1 do skeletonLines[i]:Remove() skeletonLines[i] = nil end
 
-    if not (espBoxEnabled or espTracerEnabled or espNamesEnabled or espDistanceEnabled) then return end
+    if not (espBoxEnabled or espTracerEnabled or espNamesEnabled or skeletonEspEnabled) then return end
 
     local camPos = Camera.CFrame.Position
     local viewport = Camera.ViewportSize
 
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") and plr.Character:FindFirstChild("Humanoid") then
-            local head = plr.Character.Head
-            local hum = plr.Character.Humanoid
+            local char = plr.Character
+            local head = char.Head
+            local hum = char.Humanoid
             local pos, onScreen = Camera:WorldToScreenPoint(head.Position)
 
             if onScreen then
@@ -881,7 +920,53 @@ RunService.RenderStepped:Connect(function()
                     tracerLines[#tracerLines + 1] = tracer
                 end
 
-                -- ESP Text Info (Names, HP, Distance)
+                -- Skeleton ESP (R15 / R6 Support)
+                if skeletonEspEnabled then
+                    local function drawBone(part1, part2)
+                        if part1 and part2 then
+                            local p1, on1 = Camera:WorldToScreenPoint(part1.Position)
+                            local p2, on2 = Camera:WorldToScreenPoint(part2.Position)
+                            if on1 and on2 then
+                                local boneLine = Drawing.new("Line")
+                                boneLine.From = Vector2.new(p1.X, p1.Y)
+                                boneLine.To = Vector2.new(p2.X, p2.Y)
+                                boneLine.Color = Color3.fromRGB(255, 0, 255)
+                                boneLine.Thickness = 1.5
+                                boneLine.Transparency = 0.8
+                                boneLine.Visible = true
+                                skeletonLines[#skeletonLines + 1] = boneLine
+                            end
+                        end
+                    end
+
+                    -- Check R15 or R6
+                    if char:FindFirstChild("UpperTorso") then
+                        -- R15 Skeleton
+                        drawBone(char.Head, char.UpperTorso)
+                        drawBone(char.UpperTorso, char.LowerTorso)
+                        drawBone(char.UpperTorso, char.LeftUpperArm)
+                        drawBone(char.LeftUpperArm, char.LeftLowerArm)
+                        drawBone(char.LeftLowerArm, char.LeftHand)
+                        drawBone(char.UpperTorso, char.RightUpperArm)
+                        drawBone(char.RightUpperArm, char.RightLowerArm)
+                        drawBone(char.RightLowerArm, char.RightHand)
+                        drawBone(char.LowerTorso, char.LeftUpperLeg)
+                        drawBone(char.LeftUpperLeg, char.LeftLowerLeg)
+                        drawBone(char.LeftLowerLeg, char.LeftFoot)
+                        drawBone(char.LowerTorso, char.RightUpperLeg)
+                        drawBone(char.RightUpperLeg, char.RightLowerLeg)
+                        drawBone(char.RightLowerLeg, char.RightFoot)
+                    elseif char:FindFirstChild("Torso") then
+                        -- R6 Skeleton
+                        drawBone(char.Head, char.Torso)
+                        drawBone(char.Torso, char["Left Arm"])
+                        drawBone(char.Torso, char["Right Arm"])
+                        drawBone(char.Torso, char["Left Leg"])
+                        drawBone(char.Torso, char["Right Leg"])
+                    end
+                end
+
+                -- Names & Stats Text
                 if espNamesEnabled or espDistanceEnabled then
                     local text = Drawing.new("Text")
                     text.Position = Vector2.new(pos.X, pos.Y - size/2 - 15)
@@ -904,7 +989,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Wallhack Auto-Apply
+-- Wallhack Highlight Loop
 RunService.Heartbeat:Connect(function()
     if wallhackEnabled then
         for _, plr in pairs(Players:GetPlayers()) do
@@ -921,4 +1006,9 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-setStatus("WIA HUB v8 Loaded! | Bhop FIXED | TP Tool Added", Color3.fromRGB(0, 255, 150))
+Rayfield:Notify({
+    Title = "WIA HUB v8.0 Loaded",
+    Content = "Rayfield UI + Skeleton ESP + Persistent TP Tool active!",
+    Duration = 5,
+    Image = 4483362458,
+})
