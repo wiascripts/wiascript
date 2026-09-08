@@ -39,31 +39,31 @@ local Settings = {
     FlySpeed = 50,
     Noclip = false,
     InfiniteJump = false,
-    
+
     -- Combat
     Aimbot = false,
     AimbotFOV = 120,
     Smoothness = 3,
     KillAura = false,
     KillRadius = 15,
-    
+
     -- MM2 Master & Visuals
     PlayerESP = false,
     CoinESP = false,
     GunESP = false,
-    
+
     MurdererColor = Color3.fromRGB(255, 0, 0),
     SheriffColor = Color3.fromRGB(0, 150, 255),
     InnocentColor = Color3.fromRGB(0, 255, 0),
     CoinColor = Color3.fromRGB(255, 215, 0),
     GunColor = Color3.fromRGB(255, 255, 0),
-    
+
     -- Automation
     AutoFarm = false,
     FarmSpeed = 0.3,
     AutoGrabGun = false,
     AntiKnife = false,
-    
+
     -- Utility
     AntiAFK = true,
     FullBright = false,
@@ -131,7 +131,21 @@ local UtilityState = {
 
 local UtilityObjects = {}
 
+-- Переменная для сохранения экземпляра Orion
+local OrionLib = nil
+
 -- ========== 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+local function Notify(title, content, duration)
+    if OrionLib and OrionLib.MakeNotification then
+        OrionLib:MakeNotification({
+            Name = title or "WIA HUB",
+            Content = content or "",
+            Image = "rbxassetid://4483362458",
+            Time = duration or 3
+        })
+    end
+end
+
 local function SafeGetCamera()
     return Workspace.CurrentCamera or Workspace:FindFirstChildOfClass("Camera")
 end
@@ -142,16 +156,16 @@ local function GetCoinContainers()
     if now - CoinContainerCache.Timestamp < CoinContainerCache.UpdateInterval then
         return CoinContainerCache.Containers
     end
-    
+
     CoinContainerCache.Timestamp = now
     CoinContainerCache.Containers = {}
-    
+
     for _, obj in pairs(Workspace:GetDescendants()) do
         if obj.Name == "CoinContainer" then
             table.insert(CoinContainerCache.Containers, obj)
         end
     end
-    
+
     return CoinContainerCache.Containers
 end
 
@@ -164,12 +178,12 @@ local function GetCoinsCached()
     if now - CoinCache.Timestamp < CoinCache.UpdateInterval then
         return CoinCache.Coins
     end
-    
+
     CoinCache.Timestamp = now
     CoinCache.Coins = {}
-    
+
     local containers = GetCoinContainers()
-    
+
     for _, container in pairs(containers) do
         for _, child in pairs(container:GetChildren()) do
             if child:IsA("BasePart") and child.Transparency and child.Transparency < 0.9 then
@@ -182,7 +196,7 @@ local function GetCoinsCached()
             end
         end
     end
-    
+
     return CoinCache.Coins
 end
 
@@ -198,14 +212,14 @@ local function SetupWorkspaceWatcher()
             InvalidateCoinCache()
         end
     end
-    
+
     local function onDescendantRemoved(descendant)
         if descendant.Name == "CoinContainer" or 
            (descendant:IsA("BasePart") and descendant.Name == "Coin") then
             InvalidateCoinCache()
         end
     end
-    
+
     TrackConnection(Workspace.DescendantAdded:Connect(onDescendantAdded))
     TrackConnection(Workspace.DescendantRemoved:Connect(onDescendantRemoved))
 end
@@ -216,7 +230,7 @@ local function GetNearestCoin(position)
     local coins = GetCoinsCached()
     local nearest = nil
     local minDist = math.huge
-    
+
     for _, coin in pairs(coins) do
         if coin and coin.Position then
             local dist = (position - coin.Position).Magnitude
@@ -226,40 +240,40 @@ local function GetNearestCoin(position)
             end
         end
     end
-    
+
     return nearest
 end
 
 local function GetPlayerRole(player)
     if not player then return "Innocent" end
-    
+
     if ESPCache.PlayerRoles[player] and ESPCache.PlayerRoles[player].Timestamp > tick() - 0.2 then
         return ESPCache.PlayerRoles[player].Role
     end
-    
+
     local role = "Innocent"
     local char = player.Character
     local bp = player:FindFirstChild("Backpack")
-    
+
     if char or bp then
         local function hasItem(name)
             if char and char:FindFirstChild(name) then return true end
             if bp and bp:FindFirstChild(name) then return true end
             return false
         end
-        
+
         if hasItem("Knife") then
             role = "Murderer"
         elseif hasItem("Gun") or hasItem("Revolver") then
             role = "Sheriff"
         end
     end
-    
+
     ESPCache.PlayerRoles[player] = {
         Role = role,
         Timestamp = tick()
     }
-    
+
     return role
 end
 
@@ -276,17 +290,17 @@ local function GetGunDrop()
         if obj.Name == "GunDrop" and obj:IsA("BasePart") then
             return obj
         end
-        
+
         if obj:IsA("Model") then
             local gunDrop = obj:FindFirstChild("GunDrop")
             if gunDrop and gunDrop:IsA("BasePart") then
                 return obj
             end
-            
+
             if obj.Name ~= "Character" and obj.Name ~= "Player" then
                 local hasGun = false
                 local isTool = false
-                
+
                 for _, child in pairs(obj:GetChildren()) do
                     if child:IsA("BasePart") and (child.Name == "Gun" or child.Name == "Revolver") then
                         hasGun = true
@@ -295,7 +309,7 @@ local function GetGunDrop()
                         isTool = true
                     end
                 end
-                
+
                 if hasGun and not isTool then
                     return obj
                 end
@@ -307,173 +321,144 @@ end
 
 -- ========== НОВЫЕ UTILITY ФУНКЦИИ ==========
 
--- Получение списка игроков
 local function GetPlayerList()
     local list = {}
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer then
-            table.insert(list, plr)
+            table.insert(list, plr.Name)
         end
+    end
+    if #list == 0 then
+        table.insert(list, "Нет игроков")
     end
     return list
 end
 
--- Обновление Dropdown игроков
-local function UpdatePlayerDropdown(dropdown)
-    if not dropdown then return end
-    
-    local players = GetPlayerList()
-    local options = {}
-    
-    for _, plr in pairs(players) do
-        table.insert(options, {
-            Name = plr.Name,
-            Value = plr.Name,
-        })
-    end
-    
-    if #options == 0 then
-        table.insert(options, {
-            Name = "Нет игроков",
-            Value = "none",
-        })
-    end
-    
-    dropdown:SetOptions(options)
-end
-
--- Телепорт к игроку
 local function TeleportToPlayer(player)
     if not player then
-        Rayfield:Notify({ Title = "Ошибка", Content = "Игрок не выбран!", Duration = 3 })
+        Notify("Ошибка", "Игрок не выбран!", 3)
         return false
     end
-    
+
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then
-        Rayfield:Notify({ Title = "Ошибка", Content = "Ваш персонаж не найден!", Duration = 3 })
+        Notify("Ошибка", "Ваш персонаж не найден!", 3)
         return false
     end
-    
+
     local targetChar = player.Character
     if not targetChar or not targetChar:FindFirstChild("HumanoidRootPart") then
-        Rayfield:Notify({ Title = "Ошибка", Content = "Персонаж игрока не найден!", Duration = 3 })
+        Notify("Ошибка", "Персонаж игрока не найден!", 3)
         return false
     end
-    
+
     local hrp = char.HumanoidRootPart
     local targetHrp = targetChar.HumanoidRootPart
-    
-    hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 3, 0)
-    Rayfield:Notify({ Title = "Успех", Content = "Телепорт к " .. player.Name .. " выполнен!", Duration = 2 })
-    return true
-end
 
--- Spectate
-local function StartSpectate(player)
-    if not player then
-        Rayfield:Notify({ Title = "Ошибка", Content = "Игрок не выбран!", Duration = 3 })
-        return false
-    end
-    
-    local targetChar = player.Character
-    if not targetChar or not targetChar:FindFirstChild("Humanoid") then
-        Rayfield:Notify({ Title = "Ошибка", Content = "У игрока нет Humanoid!", Duration = 3 })
-        return false
-    end
-    
-    local cam = SafeGetCamera()
-    if not cam then return false end
-    
-    -- Сохраняем оригинальное состояние
-    UtilityState.OriginalCameraCFrame = cam.CFrame
-    UtilityState.OriginalCameraSubject = cam.CameraSubject
-    
-    -- Переключаем на цель
-    cam.CameraSubject = targetChar.Humanoid
-    cam.CameraType = Enum.CameraType.Attach
-    
-    Settings.IsSpectating = true
-    Settings.SpectateTarget = player
-    UtilityState.IsSpectating = true
-    UtilityState.SpectateTarget = player
-    
-    Rayfield:Notify({ Title = "Spectate", Content = "Вы наблюдаете за " .. player.Name, Duration = 3 })
+    hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 3, 0)
+    Notify("Успех", "Телепорт к " .. player.Name .. " выполнен!", 2)
     return true
 end
 
 local function StopSpectate()
     local cam = SafeGetCamera()
     if not cam then return end
-    
-    cam.CameraSubject = UtilityState.OriginalCameraSubject or LocalPlayer.Character
+
+    cam.CameraSubject = UtilityState.OriginalCameraSubject or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid"))
     cam.CameraType = Enum.CameraType.Custom
-    
+
     Settings.IsSpectating = false
     Settings.SpectateTarget = nil
     UtilityState.IsSpectating = false
     UtilityState.SpectateTarget = nil
-    
-    Rayfield:Notify({ Title = "Spectate", Content = "Наблюдение остановлено", Duration = 2 })
+
+    Notify("Spectate", "Наблюдение остановлено", 2)
 end
 
--- Создание Teleport Tool
+local function StartSpectate(player)
+    if not player then
+        Notify("Ошибка", "Игрок не выбран!", 3)
+        return false
+    end
+
+    local targetChar = player.Character
+    if not targetChar or not targetChar:FindFirstChild("Humanoid") then
+        Notify("Ошибка", "У игрока нет Humanoid!", 3)
+        return false
+    end
+
+    local cam = SafeGetCamera()
+    if not cam then return false end
+
+    UtilityState.OriginalCameraCFrame = cam.CFrame
+    UtilityState.OriginalCameraSubject = cam.CameraSubject
+
+    cam.CameraSubject = targetChar.Humanoid
+    cam.CameraType = Enum.CameraType.Attach
+
+    Settings.IsSpectating = true
+    Settings.SpectateTarget = player
+    UtilityState.IsSpectating = true
+    UtilityState.SpectateTarget = player
+
+    Notify("Spectate", "Вы наблюдаете за " .. player.Name, 3)
+    return true
+end
+
 local function CreateTeleportTool()
-    -- Удаляем старый инструмент если есть
     if UtilityState.TeleportTool then
         UtilityState.TeleportTool:Destroy()
         UtilityState.TeleportTool = nil
     end
-    
+
     local tool = Instance.new("Tool")
     tool.Name = "WIA_TeleportTool"
     tool.RequiresHandle = false
     tool.CanBeDropped = false
-    
+
     local teleportPoint = nil
-    
+
     tool.Activated:Connect(function()
         if not teleportPoint then
-            Rayfield:Notify({ Title = "Ошибка", Content = "Сначала выберите точку (клик правой кнопкой)!" , Duration = 3 })
+            Notify("Ошибка", "Сначала выберите точку (клик правой кнопкой)!", 3)
             return
         end
-        
+
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             char.HumanoidRootPart.CFrame = teleportPoint
-            Rayfield:Notify({ Title = "Телепорт", Content = "Перемещён в выбранную точку!", Duration = 2 })
+            Notify("Телепорт", "Перемещён в выбранную точку!", 2)
         end
     end)
-    
+
     tool:GetPropertyChangedSignal("Parent"):Connect(function()
         if tool.Parent == nil then
             teleportPoint = nil
         end
     end)
-    
+
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.MouseButton2 and tool.Parent == LocalPlayer.Character then
             local target = Mouse.Hit
             if target and target.Position then
                 teleportPoint = target
-                Rayfield:Notify({ Title = "Точка сохранена", Content = "Позиция: " .. tostring(target.Position), Duration = 2 })
+                Notify("Точка сохранена", "Позиция: " .. tostring(target.Position), 2)
             end
         end
     end)
-    
+
     tool.Parent = LocalPlayer.Backpack
     UtilityState.TeleportTool = tool
     table.insert(UtilityObjects, tool)
-    
-    Rayfield:Notify({ Title = "Успех", Content = "Teleport Tool создан! Кликните ПКМ для выбора точки, затем ЛКМ для телепорта.", Duration = 5 })
+
+    Notify("Успех", "Teleport Tool создан! ПКМ - выбор точки, ЛКМ - телепорт.", 5)
 end
 
--- Remove Tools
 local function RemoveAllTools()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return end
-    
+
     local count = 0
     for _, tool in pairs(backpack:GetChildren()) do
         if tool:IsA("Tool") then
@@ -481,36 +466,34 @@ local function RemoveAllTools()
             count = count + 1
         end
     end
-    
-    Rayfield:Notify({ Title = "Очистка", Content = "Удалено инструментов: " .. count, Duration = 2 })
+
+    Notify("Очистка", "Удалено инструментов: " .. count, 2)
 end
 
--- Clear WIA ESP
 local function ClearWIAESP()
     for _, hl in pairs(ESPCache.PlayerHighlights) do
         pcall(function() hl:Destroy() end)
     end
     ESPCache.PlayerHighlights = {}
-    
+
     for _, hl in pairs(ESPCache.CoinHighlights) do
         pcall(function() hl:Destroy() end)
     end
     ESPCache.CoinHighlights = {}
-    
+
     if ESPCache.GunHighlight then
         pcall(function() ESPCache.GunHighlight:Destroy() end)
         ESPCache.GunHighlight = nil
     end
-    
-    Rayfield:Notify({ Title = "ESP очищен", Content = "Все выделения удалены!", Duration = 2 })
+
+    Notify("ESP очищен", "Все выделения удалены!", 2)
 end
 
--- Reset Character
 local function ResetCharacter()
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("Humanoid") then
         char.Humanoid.Health = 0
-        Rayfield:Notify({ Title = "Респавн", Content = "Персонаж пересоздаётся...", Duration = 2 })
+        Notify("Респавн", "Персонаж пересоздаётся...", 2)
     end
 end
 
@@ -520,11 +503,11 @@ local function ApplyMovementSettings()
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
-    
+
     if hum.WalkSpeed ~= Settings.Speed then
         hum.WalkSpeed = Settings.Speed
     end
-    
+
     if hum.JumpPower ~= Settings.JumpPower then
         hum.JumpPower = Settings.JumpPower
     end
@@ -539,14 +522,14 @@ local function UpdateFlight()
         local char = LocalPlayer.Character
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return end
-        
+
         if not FlyData.BodyVelocity then
             FlyData.BodyVelocity = Instance.new("BodyVelocity")
             FlyData.BodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
             FlyData.BodyVelocity.Parent = root
             table.insert(UtilityObjects, FlyData.BodyVelocity)
         end
-        
+
         if not FlyData.BodyGyro then
             FlyData.BodyGyro = Instance.new("BodyGyro")
             FlyData.BodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
@@ -555,22 +538,22 @@ local function UpdateFlight()
             FlyData.BodyGyro.D = 500
             table.insert(UtilityObjects, FlyData.BodyGyro)
         end
-        
+
         local cam = SafeGetCamera()
         if not cam then return end
-        
+
         local moveDir = Vector3.new(0, 0, 0)
         local forward = cam.CFrame.LookVector
         local right = cam.CFrame.RightVector
         local up = cam.CFrame.UpVector
-        
+
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + forward end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - forward end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - right end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + right end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + up end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - up end
-        
+
         if moveDir.Magnitude > 0 then
             moveDir = moveDir.Unit
             FlyData.BodyVelocity.Velocity = moveDir * Settings.FlySpeed
@@ -579,7 +562,7 @@ local function UpdateFlight()
         else
             FlyData.BodyVelocity.Velocity = Vector3.new(0, 0, 0)
         end
-        
+
         FlyData.Active = true
     else
         if FlyData.BodyVelocity then
@@ -606,7 +589,7 @@ local function UpdatePlayerESP()
         ESPCache.PlayerHighlights = {}
         return
     end
-    
+
     local playersToRemove = {}
     for player, hl in pairs(ESPCache.PlayerHighlights) do
         if not player or not player.Parent or not player.Character or not hl.Parent then
@@ -617,14 +600,14 @@ local function UpdatePlayerESP()
     for player in pairs(playersToRemove) do
         ESPCache.PlayerHighlights[player] = nil
     end
-    
+
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character then
             local role = GetPlayerRole(plr)
             local color = (role == "Murderer" and Settings.MurdererColor) or 
                          (role == "Sheriff" and Settings.SheriffColor) or 
                          Settings.InnocentColor
-            
+
             local hl = ESPCache.PlayerHighlights[plr]
             if not hl or not hl.Parent then
                 hl = Instance.new("Highlight")
@@ -635,7 +618,7 @@ local function UpdatePlayerESP()
                 hl.Parent = plr.Character
                 ESPCache.PlayerHighlights[plr] = hl
             end
-            
+
             if hl.FillColor ~= color then
                 hl.FillColor = color
             end
@@ -651,13 +634,13 @@ local function UpdateCoinESP()
         ESPCache.CoinHighlights = {}
         return
     end
-    
+
     local coins = GetCoinsCached()
     local currentCoins = {}
     for _, coin in pairs(coins) do
         currentCoins[coin] = true
     end
-    
+
     local toRemove = {}
     for coin, hl in pairs(ESPCache.CoinHighlights) do
         if not coin or not coin.Parent or not currentCoins[coin] then
@@ -668,7 +651,7 @@ local function UpdateCoinESP()
     for coin in pairs(toRemove) do
         ESPCache.CoinHighlights[coin] = nil
     end
-    
+
     for _, coin in pairs(coins) do
         if coin and coin.Parent and not ESPCache.CoinHighlights[coin] then
             local hl = Instance.new("Highlight")
@@ -685,7 +668,7 @@ end
 
 local function UpdateGunESP()
     local gun = GetGunDrop()
-    
+
     if not Settings.GunESP or not gun then
         if ESPCache.GunHighlight then
             pcall(function() ESPCache.GunHighlight:Destroy() end)
@@ -694,13 +677,13 @@ local function UpdateGunESP()
         ESPCache.GunObject = nil
         return
     end
-    
+
     if ESPCache.GunObject ~= gun then
         if ESPCache.GunHighlight then
             pcall(function() ESPCache.GunHighlight:Destroy() end)
             ESPCache.GunHighlight = nil
         end
-        
+
         local hl = Instance.new("Highlight")
         hl.Name = "Gun_ESP"
         hl.FillColor = Settings.GunColor
@@ -719,7 +702,7 @@ local function CleanupPlayer(player)
         ESPCache.PlayerHighlights[player] = nil
     end
     ESPCache.PlayerRoles[player] = nil
-    
+
     if ESPCache.PlayerBackpackConnections[player] then
         for _, conn in pairs(ESPCache.PlayerBackpackConnections[player]) do
             pcall(function() conn:Disconnect() end)
@@ -739,15 +722,13 @@ end
 local function SetupTriggers()
     local function SetupPlayer(plr)
         if plr == LocalPlayer then return end
-        
+
         TrackConnection(plr.CharacterAdded:Connect(function()
             task.wait(0.2)
             InvalidateRoleCache(plr)
             UpdatePlayerESP()
         end))
-        
-        local backpackConnections = {}
-        
+
         local function checkBackpackChange()
             task.wait(0.1)
             local oldRole = ESPCache.PlayerRoles[plr] and ESPCache.PlayerRoles[plr].Role
@@ -757,7 +738,7 @@ local function SetupTriggers()
                 UpdatePlayerESP()
             end
         end
-        
+
         local function cleanupBackpackConnections()
             if ESPCache.PlayerBackpackConnections[plr] then
                 for _, conn in pairs(ESPCache.PlayerBackpackConnections[plr]) do
@@ -766,37 +747,36 @@ local function SetupTriggers()
                 ESPCache.PlayerBackpackConnections[plr] = nil
             end
         end
-        
+
         local function setupBackpackConnections()
             cleanupBackpackConnections()
-            
-            if plr.Backpack then
+
+            if plr:FindFirstChild("Backpack") then
                 local newConnections = {}
                 table.insert(newConnections, TrackConnection(plr.Backpack.ChildAdded:Connect(checkBackpackChange)))
                 table.insert(newConnections, TrackConnection(plr.Backpack.ChildRemoved:Connect(checkBackpackChange)))
                 ESPCache.PlayerBackpackConnections[plr] = newConnections
             end
         end
-        
+
         TrackConnection(plr:GetPropertyChangedSignal("Backpack"):Connect(setupBackpackConnections))
         setupBackpackConnections()
     end
-    
+
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer then
             SetupPlayer(plr)
         end
     end
-    
+
     TrackConnection(Players.PlayerAdded:Connect(SetupPlayer))
     TrackConnection(Players.PlayerRemoving:Connect(CleanupPlayer))
-    
+
     TrackConnection(LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.1)
         ApplyMovementSettings()
         UpdateAllESP()
-        
-        -- Останавливаем spectate при респавне
+
         if UtilityState.IsSpectating then
             StopSpectate()
         end
@@ -806,9 +786,8 @@ end
 SetupTriggers()
 
 -- ================================================================= --
--- 9. ИНТЕРФЕЙС ORION LIBRARY (СТАБИЛЬНАЯ ЗАГРУЗКА С GITHUB)
+-- 9. ИНТЕРФЕЙС ORION LIBRARY (ПОЛНАЯ АДАПТАЦИЯ)
 -- ================================================================= --
-local OrionLib = nil
 local success, err = pcall(function()
     OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
 end)
@@ -825,238 +804,227 @@ local Window = OrionLib:MakeWindow({
     ConfigFolder = "WIAConfig"
 })
 
--- Вкладки Orion
+-- Вкладки
 local TabMM2 = Window:MakeTab({Name = "MM2 Master", Icon = "rbxassetid://4483362458", PremiumOnly = false})
 local TabMovement = Window:MakeTab({Name = "Movement", Icon = "rbxassetid://4483362458", PremiumOnly = false})
 local TabCombat = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483362458", PremiumOnly = false})
 local TabIYUtils = Window:MakeTab({Name = "IY Utilities", Icon = "rbxassetid://4483362458", PremiumOnly = false})
 
--- Обязательная инициализация GUI в самом конце скрипта:
-OrionLib:Init()
-
 -- ================================================================= --
 -- ВКЛАДКА: MM2 MASTER
 -- ================================================================= --
-Tabs.MM2:CreateSection("Визуалы и Подсветка (Highlight ESP)")
+TabMM2:AddSection({Name = "Визуалы и Подсветка (Highlight ESP)"})
 
-Tabs.MM2:CreateToggle({
+TabMM2:AddToggle({
     Name = "Подсветка Игроков (Wallhack)",
-    CurrentValue = false,
-    Tooltip = "Закрашивает игроков сквозь стены по их ролям.",
+    Default = false,
     Callback = function(v) 
         Settings.PlayerESP = v 
         UpdatePlayerESP()
     end
 })
 
-Tabs.MM2:CreateToggle({
+TabMM2:AddToggle({
     Name = "Подсветка Монет (Coin ESP)",
-    CurrentValue = false,
-    Tooltip = "Показывает местоположение золотых монет.",
+    Default = false,
     Callback = function(v) 
         Settings.CoinESP = v 
         UpdateCoinESP()
     end
 })
 
-Tabs.MM2:CreateToggle({
+TabMM2:AddToggle({
     Name = "Подсветка Выпавшей Пушки",
-    CurrentValue = false,
-    Tooltip = "Подсвечивает выпавший пистолет Шерифа.",
+    Default = false,
     Callback = function(v) 
         Settings.GunESP = v 
         UpdateGunESP()
     end
 })
 
-Tabs.MM2:CreateSection("Автоматизация MM2")
+TabMM2:AddSection({Name = "Автоматизация MM2"})
 
-Tabs.MM2:CreateToggle({
+TabMM2:AddToggle({
     Name = "Автофарм Монет",
-    CurrentValue = false,
-    Tooltip = "Автоматически собирает монеты на карте.",
+    Default = false,
     Callback = function(v) Settings.AutoFarm = v end
 })
 
-Tabs.MM2:CreateSlider({
+TabMM2:AddSlider({
     Name = "Задержка автофарма (сек)",
-    Range = {0.1, 1},
+    Min = 0.1,
+    Max = 1,
+    Default = 0.3,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 0.05,
-    Suffix = "с",
-    CurrentValue = 0.3,
-    Tooltip = "Задержка между телепортами.",
+    ValueName = "сек",
     Callback = function(v) Settings.FarmSpeed = v end
 })
 
-Tabs.MM2:CreateToggle({
+TabMM2:AddToggle({
     Name = "Авто-подбор Пушки",
-    CurrentValue = false,
-    Tooltip = "Автоматически забирает пистолет Шерифа.",
+    Default = false,
     Callback = function(v) Settings.AutoGrabGun = v end
 })
 
-Tabs.MM2:CreateButton({
+TabMM2:AddButton({
     Name = "Телепорт к Пушке",
-    Tooltip = "Телепортирует вас к выпавшему пистолету.",
     Callback = function()
         local gun = GetGunDrop()
         local char = LocalPlayer.Character
         if not gun or not char or not char:FindFirstChild("HumanoidRootPart") then
-            Rayfield:Notify({ Title = "Ошибка", Content = "Пушка или персонаж не найдены!", Duration = 3 })
+            Notify("Ошибка", "Пушка или персонаж не найдены!", 3)
             return
         end
-        
+
         local part = gun:IsA("Model") and gun.PrimaryPart or gun
         if not part then
-            Rayfield:Notify({ Title = "Ошибка", Content = "Не удалось найти часть модели!", Duration = 3 })
+            Notify("Ошибка", "Не удалось найти часть модели!", 3)
             return
         end
-        
+
         char.HumanoidRootPart.CFrame = part.CFrame + Vector3.new(0, 2, 0)
-        Rayfield:Notify({ Title = "Успех", Content = "Телепорт выполнен!", Duration = 2 })
+        Notify("Успех", "Телепорт выполнен!", 2)
     end
 })
 
-Tabs.MM2:CreateToggle({
+TabMM2:AddToggle({
     Name = "Anti-Knife (Защита)",
-    CurrentValue = false,
-    Tooltip = "Автоматически отталкивает от Мардера.",
+    Default = false,
     Callback = function(v) Settings.AntiKnife = v end
 })
 
 -- ================================================================= --
 -- ВКЛАДКА: MOVEMENT
 -- ================================================================= --
-Tabs.Movement:CreateSection("Модификаторы движения")
+TabMovement:AddSection({Name = "Модификаторы движения"})
 
-Tabs.Movement:CreateSlider({
+TabMovement:AddSlider({
     Name = "Скорость бега (Speed)",
-    Range = {16, 120},
+    Min = 16,
+    Max = 120,
+    Default = 16,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 1,
-    Suffix = " studs",
-    CurrentValue = 16,
-    Tooltip = "Увеличивает скорость перемещения.",
+    ValueName = "studs",
     Callback = function(v) 
         Settings.Speed = v 
         ApplyMovementSettings()
     end
 })
 
-Tabs.Movement:CreateSlider({
+TabMovement:AddSlider({
     Name = "Сила прыжка (Jump Power)",
-    Range = {50, 200},
+    Min = 50,
+    Max = 200,
+    Default = 50,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 5,
-    Suffix = "",
-    CurrentValue = 50,
-    Tooltip = "Увеличивает высоту прыжка.",
+    ValueName = "",
     Callback = function(v) 
         Settings.JumpPower = v 
         ApplyMovementSettings()
     end
 })
 
-Tabs.Movement:CreateToggle({
+TabMovement:AddToggle({
     Name = "Бесконечный прыжок",
-    CurrentValue = false,
-    Tooltip = "Позволяет прыгать в воздухе.",
+    Default = false,
     Callback = function(v) Settings.InfiniteJump = v end
 })
 
-Tabs.Movement:CreateToggle({
+TabMovement:AddToggle({
     Name = "Полёты (Fly)",
-    CurrentValue = false,
-    Tooltip = "Свободный полёт (WASD, Space, Shift).",
+    Default = false,
     Callback = function(v) 
         Settings.Fly = v 
         if not v then UpdateFlight() end
     end
 })
 
-Tabs.Movement:CreateSlider({
+TabMovement:AddSlider({
     Name = "Скорость полёта",
-    Range = {10, 300},
+    Min = 10,
+    Max = 300,
+    Default = 50,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 5,
-    Suffix = " speed",
-    CurrentValue = 50,
-    Tooltip = "Скорость передвижения в режиме полёта.",
+    ValueName = "speed",
     Callback = function(v) Settings.FlySpeed = v end
 })
 
-Tabs.Movement:CreateToggle({
+TabMovement:AddToggle({
     Name = "Проход сквозь стены",
-    CurrentValue = false,
-    Tooltip = "Отключает коллизию персонажа.",
+    Default = false,
     Callback = function(v) Settings.Noclip = v end
 })
 
 -- ================================================================= --
 -- ВКЛАДКА: COMBAT
 -- ================================================================= --
-Tabs.Combat:CreateSection("Аимбот и Киллаура")
+TabCombat:AddSection({Name = "Аимбот и Киллаура"})
 
-Tabs.Combat:CreateToggle({
+TabCombat:AddToggle({
     Name = "Aimbot на Мардера",
-    CurrentValue = false,
-    Tooltip = "Наводит камеру на Мардера.",
+    Default = false,
     Callback = function(v) Settings.Aimbot = v end
 })
 
-Tabs.Combat:CreateSlider({
+TabCombat:AddSlider({
     Name = "Радиус Aimbot",
-    Range = {30, 400},
+    Min = 30,
+    Max = 400,
+    Default = 120,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 10,
-    Suffix = "px",
-    CurrentValue = 120,
-    Tooltip = "Размер области действия.",
+    ValueName = "px",
     Callback = function(v) Settings.AimbotFOV = v end
 })
 
-Tabs.Combat:CreateSlider({
+TabCombat:AddSlider({
     Name = "Плавность Aimbot",
-    Range = {1, 20},
+    Min = 1,
+    Max = 20,
+    Default = 3,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 1,
-    Suffix = "",
-    CurrentValue = 3,
-    Tooltip = "Плавность наведения (1 - мгновенно, 20 - очень плавно).",
+    ValueName = "",
     Callback = function(v) Settings.Smoothness = v end
 })
 
-Tabs.Combat:CreateToggle({
+TabCombat:AddToggle({
     Name = "Kill Aura",
-    CurrentValue = false,
-    Tooltip = "Автоматически атакует всех рядом.",
+    Default = false,
     Callback = function(v) Settings.KillAura = v end
 })
 
-Tabs.Combat:CreateSlider({
+TabCombat:AddSlider({
     Name = "Радиус Kill Aura",
-    Range = {1, 50},
+    Min = 1,
+    Max = 50,
+    Default = 15,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 1,
-    Suffix = " studs",
-    CurrentValue = 15,
-    Tooltip = "Радиус действия Kill Aura.",
+    ValueName = "studs",
     Callback = function(v) Settings.KillRadius = v end
 })
 
 -- ================================================================= --
--- ВКЛАДКА: INFINITY YIELD UTILITIES (РАСШИРЕННАЯ)
+-- ВКЛАДКА: INFINITY YIELD UTILITIES
 -- ================================================================= --
 
--- ====== PLAYER UTILITIES SECTION ======
-local PlayerUtilsSection = Tabs.IYUtils:CreateSection("Player Utilities")
+TabIYUtils:AddSection({Name = "Player Utilities"})
 
--- Player Dropdown
-local playerDropdown = Tabs.IYUtils:CreateDropdown({
+local playerDropdown = TabIYUtils:AddDropdown({
     Name = "Выбрать игрока",
-    Options = {},
-    CurrentOption = "none",
-    Tooltip = "Выберите игрока для действий",
+    Default = "Нет игроков",
+    Options = GetPlayerList(),
     Callback = function(option)
-        if option == "none" then
+        if option == "Нет игроков" then
             UtilityState.SelectedPlayer = nil
             return
         end
-        
+
         for _, plr in pairs(Players:GetPlayers()) do
             if plr.Name == option and plr ~= LocalPlayer then
                 UtilityState.SelectedPlayer = plr
@@ -1068,33 +1036,14 @@ local playerDropdown = Tabs.IYUtils:CreateDropdown({
 
 UtilityState.PlayerDropdown = playerDropdown
 
--- Обновление списка игроков
 local function RefreshPlayerList()
     if not playerDropdown then return end
-    
-    local players = GetPlayerList()
-    local options = {}
-    
-    if #players == 0 then
-        table.insert(options, {
-            Name = "Нет игроков",
-            Value = "none",
-        })
-    else
-        for _, plr in pairs(players) do
-            table.insert(options, {
-                Name = plr.Name,
-                Value = plr.Name,
-            })
-        end
-    end
-    
-    playerDropdown:SetOptions(options)
-    
-    -- Проверяем выбранного игрока
+    local options = GetPlayerList()
+    playerDropdown:Refresh(options, true)
+
     if UtilityState.SelectedPlayer then
         local stillExists = false
-        for _, plr in pairs(players) do
+        for _, plr in pairs(Players:GetPlayers()) do
             if plr == UtilityState.SelectedPlayer then
                 stillExists = true
                 break
@@ -1102,102 +1051,85 @@ local function RefreshPlayerList()
         end
         if not stillExists then
             UtilityState.SelectedPlayer = nil
-            playerDropdown:SetCurrentOption("none")
         end
     end
 end
 
--- Обновление при добавлении/удалении игроков
 TrackConnection(Players.PlayerAdded:Connect(RefreshPlayerList))
 TrackConnection(Players.PlayerRemoving:Connect(RefreshPlayerList))
 
--- Teleport to Player
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Teleport to Player",
-    Tooltip = "Телепортирует вас к выбранному игроку",
     Callback = function()
         if not UtilityState.SelectedPlayer then
-            Rayfield:Notify({ Title = "Ошибка", Content = "Сначала выберите игрока!", Duration = 3 })
+            Notify("Ошибка", "Сначала выберите игрока!", 3)
             return
         end
         TeleportToPlayer(UtilityState.SelectedPlayer)
     end
 })
 
--- Spectate Player
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Spectate Player",
-    Tooltip = "Начать наблюдение за выбранным игроком",
     Callback = function()
         if not UtilityState.SelectedPlayer then
-            Rayfield:Notify({ Title = "Ошибка", Content = "Сначала выберите игрока!", Duration = 3 })
+            Notify("Ошибка", "Сначала выберите игрока!", 3)
             return
         end
         StartSpectate(UtilityState.SelectedPlayer)
     end
 })
 
--- Stop Spectating
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Stop Spectating",
-    Tooltip = "Остановить наблюдение",
     Callback = function()
         StopSpectate()
     end
 })
 
--- Copy Player Name
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Copy Player Name",
-    Tooltip = "Копирует имя выбранного игрока",
     Callback = function()
         if not UtilityState.SelectedPlayer then
-            Rayfield:Notify({ Title = "Ошибка", Content = "Сначала выберите игрока!", Duration = 3 })
+            Notify("Ошибка", "Сначала выберите игрока!", 3)
             return
         end
-        setclipboard and setclipboard(UtilityState.SelectedPlayer.Name) or nil
-        Rayfield:Notify({ Title = "Скопировано", Content = "Имя: " .. UtilityState.SelectedPlayer.Name, Duration = 2 })
+        if setclipboard then setclipboard(UtilityState.SelectedPlayer.Name) end
+        Notify("Скопировано", "Имя: " .. UtilityState.SelectedPlayer.Name, 2)
     end
 })
 
--- Copy UserId
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Copy UserId",
-    Tooltip = "Копирует UserId выбранного игрока",
     Callback = function()
         if not UtilityState.SelectedPlayer then
-            Rayfield:Notify({ Title = "Ошибка", Content = "Сначала выберите игрока!", Duration = 3 })
+            Notify("Ошибка", "Сначала выберите игрока!", 3)
             return
         end
-        setclipboard and setclipboard(tostring(UtilityState.SelectedPlayer.UserId)) or nil
-        Rayfield:Notify({ Title = "Скопировано", Content = "UserId: " .. UtilityState.SelectedPlayer.UserId, Duration = 2 })
+        if setclipboard then setclipboard(tostring(UtilityState.SelectedPlayer.UserId)) end
+        Notify("Скопировано", "UserId: " .. UtilityState.SelectedPlayer.UserId, 2)
     end
 })
 
--- Refresh Player List
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Refresh Player List",
-    Tooltip = "Обновить список игроков",
     Callback = function()
         RefreshPlayerList()
-        Rayfield:Notify({ Title = "Обновлено", Content = "Список игроков обновлён!", Duration = 2 })
+        Notify("Обновлено", "Список игроков обновлён!", 2)
     end
 })
 
--- ====== MOVEMENT UTILITIES ======
-local MovementUtilsSection = Tabs.IYUtils:CreateSection("Movement Utilities")
+TabIYUtils:AddSection({Name = "Movement Utilities"})
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Reset Character",
-    Tooltip = "Пересоздать персонажа",
     Callback = function()
         ResetCharacter()
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Sit",
-    Tooltip = "Усадить персонажа",
     Callback = function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
@@ -1206,9 +1138,8 @@ Tabs.IYUtils:CreateButton({
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Force Jump",
-    Tooltip = "Заставить персонажа прыгнуть",
     Callback = function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("Humanoid") then
@@ -1217,13 +1148,11 @@ Tabs.IYUtils:CreateButton({
     end
 })
 
--- ====== WORLD / VISUAL UTILITIES ======
-local WorldUtilsSection = Tabs.IYUtils:CreateSection("World & Visual")
+TabIYUtils:AddSection({Name = "World & Visual"})
 
-Tabs.IYUtils:CreateToggle({
+TabIYUtils:AddToggle({
     Name = "No Fog",
-    CurrentValue = false,
-    Tooltip = "Убирает туман",
+    Default = false,
     Callback = function(v)
         Settings.NoFog = v
         if v then
@@ -1234,9 +1163,8 @@ Tabs.IYUtils:CreateToggle({
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Restore Lighting",
-    Tooltip = "Восстанавливает оригинальное освещение",
     Callback = function()
         Lighting.Brightness = OriginalLighting.Brightness or 1
         Lighting.ClockTime = OriginalLighting.ClockTime or 14
@@ -1245,38 +1173,39 @@ Tabs.IYUtils:CreateButton({
         Lighting.OutdoorAmbient = OriginalLighting.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
         Settings.FullBright = false
         Settings.NoFog = false
-        Rayfield:Notify({ Title = "Восстановлено", Content = "Освещение восстановлено!", Duration = 2 })
+        Notify("Восстановлено", "Освещение восстановлено!", 2)
     end
 })
 
-Tabs.IYUtils:CreateSlider({
+TabIYUtils:AddSlider({
     Name = "ClockTime",
-    Range = {0, 24},
+    Min = 0,
+    Max = 24,
+    Default = 14,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 0.5,
-    Suffix = "h",
-    CurrentValue = 14,
-    Tooltip = "Время суток",
+    ValueName = "h",
     Callback = function(v)
         Lighting.ClockTime = v
     end
 })
 
-Tabs.IYUtils:CreateSlider({
+TabIYUtils:AddSlider({
     Name = "Ambient Brightness",
-    Range = {0, 2},
+    Min = 0,
+    Max = 2,
+    Default = 1,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 0.1,
-    Suffix = "",
-    CurrentValue = 1,
-    Tooltip = "Яркость окружения",
+    ValueName = "",
     Callback = function(v)
         Lighting.Ambient = Color3.fromRGB(v * 127, v * 127, v * 127)
     end
 })
 
-Tabs.IYUtils:CreateToggle({
+TabIYUtils:AddToggle({
     Name = "Hide Local Character",
-    CurrentValue = false,
-    Tooltip = "Скрыть своего персонажа",
+    Default = false,
     Callback = function(v)
         Settings.HideLocal = v
         local char = LocalPlayer.Character
@@ -1290,89 +1219,153 @@ Tabs.IYUtils:CreateToggle({
     end
 })
 
--- ====== SERVER UTILITIES ======
-local ServerUtilsSection = Tabs.IYUtils:CreateSection("Server Utilities")
+TabIYUtils:AddSection({Name = "Server Utilities"})
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Server Info",
-    Tooltip = "Показывает информацию о сервере",
     Callback = function()
         local playerCount = #Players:GetPlayers()
         local maxPlayers = Players.MaxPlayers
-        Rayfield:Notify({ 
-            Title = "Server Info", 
-            Content = "Игроков: " .. playerCount .. "/" .. maxPlayers .. "\nPlaceId: " .. game.PlaceId .. "\nJobId: " .. game.JobId,
-            Duration = 5 
-        })
+        Notify("Server Info", "Игроков: " .. playerCount .. "/" .. maxPlayers .. "\nPlaceId: " .. game.PlaceId .. "\nJobId: " .. game.JobId, 5)
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Copy JobId",
-    Tooltip = "Копирует JobId сервера",
     Callback = function()
-        setclipboard and setclipboard(game.JobId) or nil
-        Rayfield:Notify({ Title = "Скопировано", Content = "JobId: " .. game.JobId, Duration = 2 })
+        if setclipboard then setclipboard(game.JobId) end
+        Notify("Скопировано", "JobId: " .. game.JobId, 2)
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Copy PlaceId",
-    Tooltip = "Копирует PlaceId сервера",
     Callback = function()
-        setclipboard and setclipboard(tostring(game.PlaceId)) or nil
-        Rayfield:Notify({ Title = "Скопировано", Content = "PlaceId: " .. game.PlaceId, Duration = 2 })
+        if setclipboard then setclipboard(tostring(game.PlaceId)) end
+        Notify("Скопировано", "PlaceId: " .. game.PlaceId, 2)
     end
 })
 
--- ====== UTILITY ======
-local UtilitySection = Tabs.IYUtils:CreateSection("Utility")
+TabIYUtils:AddSection({Name = "Utility"})
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Get Teleport Tool",
-    Tooltip = "Создаёт инструмент для телепортации",
     Callback = function()
         CreateTeleportTool()
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Remove All Tools",
-    Tooltip = "Удаляет все инструменты из рюкзака",
     Callback = function()
         RemoveAllTools()
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Clear WIA ESP",
-    Tooltip = "Удаляет все выделения WIA",
     Callback = function()
         ClearWIAESP()
     end
 })
 
-Tabs.IYUtils:CreateButton({
+-- Объявление функций полной очистки до их использования в GUI
+local FullCleanup, SafeCleanup
+
+FullCleanup = function()
+    for _, hl in pairs(ESPCache.PlayerHighlights) do
+        pcall(function() hl:Destroy() end)
+    end
+    ESPCache.PlayerHighlights = {}
+
+    for _, hl in pairs(ESPCache.CoinHighlights) do
+        pcall(function() hl:Destroy() end)
+    end
+    ESPCache.CoinHighlights = {}
+
+    if ESPCache.GunHighlight then
+        pcall(function() ESPCache.GunHighlight:Destroy() end)
+        ESPCache.GunHighlight = nil
+    end
+
+    for player, connections in pairs(ESPCache.PlayerBackpackConnections) do
+        for _, conn in pairs(connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+    end
+    ESPCache.PlayerBackpackConnections = {}
+
+    for part, originalValue in pairs(OriginalCollision) do
+        if part and part.Parent then
+            pcall(function() part.CanCollide = originalValue end)
+        end
+    end
+    OriginalCollision = {}
+
+    if FlyData.BodyVelocity then
+        FlyData.BodyVelocity:Destroy()
+        FlyData.BodyVelocity = nil
+    end
+    if FlyData.BodyGyro then
+        FlyData.BodyGyro:Destroy()
+        FlyData.BodyGyro = nil
+    end
+    FlyData.Active = false
+
+    if UtilityState.TeleportTool then
+        UtilityState.TeleportTool:Destroy()
+        UtilityState.TeleportTool = nil
+    end
+
+    if UtilityState.IsSpectating then
+        StopSpectate()
+    end
+
+    local cam = SafeGetCamera()
+    if cam then
+        cam.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        cam.CameraType = Enum.CameraType.Custom
+    end
+
+    Lighting.Brightness = OriginalLighting.Brightness or 1
+    Lighting.ClockTime = OriginalLighting.ClockTime or 14
+    Lighting.FogEnd = OriginalLighting.FogEnd or 10000
+    Lighting.Ambient = OriginalLighting.Ambient or Color3.fromRGB(127, 127, 127)
+    Lighting.OutdoorAmbient = OriginalLighting.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
+
+    for _, obj in pairs(UtilityObjects) do
+        pcall(function() obj:Destroy() end)
+    end
+    UtilityObjects = {}
+
+    CleanupConnections()
+end
+
+SafeCleanup = function()
+    task.spawn(FullCleanup)
+end
+
+TabIYUtils:AddButton({
     Name = "Full Cleanup",
-    Tooltip = "Полная очистка всех эффектов и соединений",
     Callback = function()
         FullCleanup()
-        Rayfield:Notify({ Title = "Очистка", Content = "Все эффекты удалены!", Duration = 3 })
+        Notify("Очистка", "Все эффекты удалены!", 3)
     end
 })
 
-Tabs.IYUtils:CreateButton({
+TabIYUtils:AddButton({
     Name = "Destroy WIA GUI",
-    Tooltip = "Закрывает интерфейс WIA HUB",
     Callback = function()
         SafeCleanup()
-        if Window and Window.Close then
-            Window:Close()
+        if OrionLib then
+            OrionLib:Destroy()
         end
     end
 })
 
--- Инициализация списка игроков
+-- Инициализация Orion GUI
+OrionLib:Init()
+
 task.wait(0.5)
 RefreshPlayerList()
 
@@ -1383,7 +1376,7 @@ RefreshPlayerList()
 -- Noclip
 TrackConnection(RunService.Stepped:Connect(function()
     if not LocalPlayer.Character then return end
-    
+
     if Settings.Noclip then
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -1419,10 +1412,10 @@ TrackConnection(RunService.Heartbeat:Connect(function()
     if Settings.AutoFarm then
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        
+
         local hrp = char.HumanoidRootPart
         local nearestCoin = GetNearestCoin(hrp.Position)
-        
+
         if nearestCoin and tick() - lastFarm > Settings.FarmSpeed then
             hrp.CFrame = nearestCoin.CFrame * CFrame.new(0, 1, 0)
             lastFarm = tick()
@@ -1433,17 +1426,17 @@ end))
 -- Anti-Knife
 TrackConnection(RunService.Heartbeat:Connect(function()
     if not Settings.AntiKnife then return end
-    
+
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    
+
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and GetPlayerRole(plr) == "Murderer" then
             local mChar = plr.Character
             if mChar and mChar:FindFirstChild("HumanoidRootPart") then
                 local mHrp = mChar.HumanoidRootPart
                 local dist = (char.HumanoidRootPart.Position - mHrp.Position).Magnitude
-                
+
                 if dist < 12 then
                     local escapeDir = (char.HumanoidRootPart.Position - mHrp.Position).Unit
                     char.HumanoidRootPart.CFrame = CFrame.new(char.HumanoidRootPart.Position + escapeDir * 15)
@@ -1456,13 +1449,13 @@ end))
 -- Auto-Grab Gun
 TrackConnection(RunService.Heartbeat:Connect(function()
     if not Settings.AutoGrabGun then return end
-    
+
     local gun = GetGunDrop()
     local char = LocalPlayer.Character
     if gun and char and char:FindFirstChild("HumanoidRootPart") then
         local hrp = char.HumanoidRootPart
         local gunPart = gun:IsA("Model") and gun.PrimaryPart or gun
-        
+
         if gunPart and (hrp.Position - gunPart.Position).Magnitude < 15 then
             hrp.CFrame = gunPart.CFrame * CFrame.new(0, 1, 0)
             if firetouchinterest then
@@ -1496,7 +1489,7 @@ TrackConnection(RunService.Heartbeat:Connect(function()
         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
         Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
     end
-    
+
     if Settings.NoFog then
         Lighting.FogEnd = 100000
     end
@@ -1505,13 +1498,13 @@ end))
 -- Aimbot
 TrackConnection(RunService.RenderStepped:Connect(function()
     if not Settings.Aimbot then return end
-    
+
     local cam = SafeGetCamera()
     if not cam then return end
-    
+
     local target = nil
     local minDist = Settings.AimbotFOV
-    
+
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and GetPlayerRole(plr) == "Murderer" and plr.Character then
             local head = plr.Character:FindFirstChild("Head")
@@ -1527,13 +1520,13 @@ TrackConnection(RunService.RenderStepped:Connect(function()
             end
         end
     end
-    
+
     if target and target.Character and target.Character:FindFirstChild("Head") then
         local head = target.Character.Head
         local targetPos = head.Position
         local currentCFrame = cam.CFrame
         local newCFrame = CFrame.new(currentCFrame.Position, targetPos)
-        
+
         if Settings.Smoothness > 1 then
             cam.CFrame = currentCFrame:Lerp(newCFrame, 1 / Settings.Smoothness)
         else
@@ -1545,18 +1538,18 @@ end))
 -- Kill Aura
 TrackConnection(RunService.RenderStepped:Connect(function()
     if not Settings.KillAura then return end
-    
+
     local char = LocalPlayer.Character
     if not char then return end
-    
+
     local knife = char:FindFirstChild("Knife")
     if not knife then return end
-    
+
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = plr.Character.HumanoidRootPart
             local dist = (char.HumanoidRootPart.Position - hrp.Position).Magnitude
-            
+
             if dist < Settings.KillRadius then
                 if knife:FindFirstChild("Stab") then
                     knife.Stab:FireServer()
@@ -1567,10 +1560,13 @@ TrackConnection(RunService.RenderStepped:Connect(function()
     end
 end))
 
--- Периодическое обновление ESP
+-- Оптимизированный периодический цикл обновления ESP (2 раз/сек)
+local lastESPUpdate = 0
 TrackConnection(RunService.Heartbeat:Connect(function()
-    if Settings.PlayerESP then
-        if tick() % 2 < 0.05 then
+    local now = tick()
+    if now - lastESPUpdate >= 0.5 then
+        lastESPUpdate = now
+        if Settings.PlayerESP then
             for _, plr in pairs(Players:GetPlayers()) do
                 if plr ~= LocalPlayer then
                     local currentRole = GetPlayerRole(plr)
@@ -1593,14 +1589,13 @@ TrackConnection(RunService.Heartbeat:Connect(function()
             StopSpectate()
             return
         end
-        
+
         local targetChar = target.Character
         if not targetChar or not targetChar:FindFirstChild("Humanoid") then
             StopSpectate()
             return
         end
-        
-        -- Проверяем, что камера всё ещё следит за целью
+
         local cam = SafeGetCamera()
         if cam and cam.CameraSubject ~= targetChar.Humanoid then
             cam.CameraSubject = targetChar.Humanoid
@@ -1608,104 +1603,6 @@ TrackConnection(RunService.Heartbeat:Connect(function()
         end
     end
 end))
-
--- ================================================================= --
--- 11. ПОЛНАЯ ОЧИСТКА
--- ================================================================= --
-local function FullCleanup()
-    -- Очищаем ESP
-    for _, hl in pairs(ESPCache.PlayerHighlights) do
-        pcall(function() hl:Destroy() end)
-    end
-    ESPCache.PlayerHighlights = {}
-    
-    for _, hl in pairs(ESPCache.CoinHighlights) do
-        pcall(function() hl:Destroy() end)
-    end
-    ESPCache.CoinHighlights = {}
-    
-    if ESPCache.GunHighlight then
-        pcall(function() ESPCache.GunHighlight:Destroy() end)
-        ESPCache.GunHighlight = nil
-    end
-    
-    -- Очищаем соединения Backpack
-    for player, connections in pairs(ESPCache.PlayerBackpackConnections) do
-        for _, conn in pairs(connections) do
-            pcall(function() conn:Disconnect() end)
-        end
-    end
-    ESPCache.PlayerBackpackConnections = {}
-    
-    -- Восстанавливаем Noclip
-    for part, originalValue in pairs(OriginalCollision) do
-        if part and part.Parent then
-            pcall(function() part.CanCollide = originalValue end)
-        end
-    end
-    OriginalCollision = {}
-    
-    -- Очищаем полёт
-    if FlyData.BodyVelocity then
-        FlyData.BodyVelocity:Destroy()
-        FlyData.BodyVelocity = nil
-    end
-    if FlyData.BodyGyro then
-        FlyData.BodyGyro:Destroy()
-        FlyData.BodyGyro = nil
-    end
-    FlyData.Active = false
-    
-    -- Удаляем Teleport Tool
-    if UtilityState.TeleportTool then
-        UtilityState.TeleportTool:Destroy()
-        UtilityState.TeleportTool = nil
-    end
-    
-    -- Останавливаем Spectate
-    if UtilityState.IsSpectating then
-        StopSpectate()
-    end
-    
-    -- Восстанавливаем камеру
-    local cam = SafeGetCamera()
-    if cam then
-        cam.CameraSubject = LocalPlayer.Character
-        cam.CameraType = Enum.CameraType.Custom
-    end
-    
-    -- Восстанавливаем освещение
-    Lighting.Brightness = OriginalLighting.Brightness or 1
-    Lighting.ClockTime = OriginalLighting.ClockTime or 14
-    Lighting.FogEnd = OriginalLighting.FogEnd or 10000
-    Lighting.Ambient = OriginalLighting.Ambient or Color3.fromRGB(127, 127, 127)
-    Lighting.OutdoorAmbient = OriginalLighting.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
-    
-    -- Удаляем Utility Objects
-    for _, obj in pairs(UtilityObjects) do
-        pcall(function() obj:Destroy() end)
-    end
-    UtilityObjects = {}
-    
-    -- Отключаем все соединения
-    CleanupConnections()
-end
-
--- Безопасная очистка
-local function SafeCleanup()
-    task.spawn(FullCleanup)
-end
-
--- Подписываемся на закрытие окна
-if Window and Window.Close then
-    local oldClose = Window.Close
-    Window.Close = function(...)
-        SafeCleanup()
-        if oldClose then
-            return oldClose(...)
-        end
-    end
-end
 
 -- Очистка при выходе
 TrackConnection(LocalPlayer:GetPropertyChangedSignal("Parent"):Connect(function()
@@ -1722,11 +1619,7 @@ ApplyMovementSettings()
 UpdateAllESP()
 RefreshPlayerList()
 
-Rayfield:Notify({
-    Title = "WIA HUB v12.6",
-    Content = "Расширенная версия. Готов к работе!",
-    Duration = 5
-})
+Notify("WIA HUB v12.6", "Расширенная версия загружена и оптимизирована!", 5)
 
 print("WIA HUB v12.6 Loaded Successfully!")
 print("Extended version with Player List, Teleport Tool, and IY Utilities!")
