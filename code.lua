@@ -1660,5 +1660,129 @@ MainTab:AddSlider({
     end    
 })
 
--- Инициализация графического интерфейса
+-- Защищенная загрузка Orion Library
+local success, OrionLib = pcall(function()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
+end)
+
+if not success or not OrionLib then
+    warn("[WIA] Ошибка: Не удалось загрузить Orion Library")
+    return
+end
+
+-- Создание главного окна
+local Window = OrionLib:MakeWindow({
+    Name = "WIA Script Hub",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "WiaConfig"
+})
+
+-- Создание вкладки "Main"
+local MainTab = Window:MakeTab({
+    Name = "Main",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+MainTab:AddSection({
+    Name = "Основные функции"
+})
+
+MainTab:AddButton({
+    Name = "Проверить работу",
+    Callback = function()
+        OrionLib:MakeNotification({
+            Name = "Успешно!",
+            Content = "WIA Script работает без ошибок!",
+            Image = "rbxassetid://4483345998",
+            Time = 5
+        })
+    end    
+})
+
+MainTab:AddSlider({
+    Name = "Скорость (WalkSpeed)",
+    Min = 16,
+    Max = 100,
+    Default = 16,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 1,
+    ValueName = "Speed",
+    Callback = function(Value)
+        local character = game.Players.LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.WalkSpeed = Value
+        end
+    end    
+})
+
+MainTab:AddSlider({
+    Name = "Высота прыжка (JumpPower)",
+    Min = 50,
+    Max = 200,
+    Default = 50,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 1,
+    ValueName = "Power",
+    Callback = function(Value)
+        local character = game.Players.LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.UseJumpPower = true
+            character.Humanoid.JumpPower = Value
+        end
+    end    
+})
+
+-- Создание вкладки "Visuals"
+local VisualsTab = Window:MakeTab({
+    Name = "Visuals",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+VisualsTab:AddSection({
+    Name = "Настройки мира"
+})
+
+VisualsTab:AddToggle({
+    Name = "Fullbright (Убрать темноту)",
+    Default = false,
+    Callback = function(State)
+        local Lighting = game:GetService("Lighting")
+        if State then
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.GlobalShadows = false
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        else
+            Lighting.Brightness = 1
+            Lighting.GlobalShadows = true
+            Lighting.OutdoorAmbient = Color3.fromRGB(127, 127, 127)
+        end
+    end
+})
+
+-- Создание вкладки "Teleports"
+local TeleportTab = Window:MakeTab({
+    Name = "Teleports",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+TeleportTab:AddSection({
+    Name = "Телепортация"
+})
+
+TeleportTab:AddButton({
+    Name = "Телепорт вверх (+50 studs)",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame + Vector3.new(0, 50, 0)
+        end
+    end
+})
+
+-- Инициализация интерфейса
 OrionLib:Init()
