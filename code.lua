@@ -1,6 +1,6 @@
 -- ================================================================= --
--- WIA HUB v9.0 Ultimate Edition :: whitewia / tordark (Rayfield GUI)
--- FULL FEATURES + FIXED SKELETON + ENHANCED NOCLIP + GRAVITY & CAM
+-- WIA HUB v9.5 Ultimate Edition :: whitewia / tordark (Rayfield GUI)
+-- FIXED: Hitboxes, Wallhack Toggle, ESP Text, JumpPower, Aimbot Selector
 -- ================================================================= --
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -38,11 +38,12 @@ local antiVoidEnabled = false
 local fullBrightEnabled, noFogEnabled = false, false
 local originalBrightness, originalAmbient, originalFog = nil, nil, nil
 
--- New Features & Adjustments Variables
+-- Custom Gravity Variables
 local customGravityEnabled = false
 local gravityValue = 196.2
 local originalGravity = Workspace.Gravity
 
+-- Freecam & Spectate
 local freecamEnabled = false
 local freecamSpeed = 50
 local freecamPos = Vector3.new(0, 10, 0)
@@ -50,14 +51,17 @@ local freecamPos = Vector3.new(0, 10, 0)
 local spectateEnabled = false
 local spectateTarget = nil
 
+-- Aimbot Variables
 local aimbotFOV = 90
 local aimbotSmoothness = 5
 local aimbotSelectedTarget = nil
 local fovCircleVisible = true
 local aimbotEnabled = false
 
+-- Hitbox & Misc Utilities
 local hitboxEnabled = false
 local hitboxSize = 5
+local originalHitboxSizes = {}
 local autoClickerEnabled, autoClickerDelay = false, 100
 local triggerbotEnabled = false
 
@@ -87,8 +91,8 @@ end
 
 -- ========== RAYFIELD WINDOW SETUP ==========
 local Window = Rayfield:CreateWindow({
-    Name = "WIA HUB v9.0 Ultimate Edition",
-    LoadingTitle = "WIA HUB v9.0 Loading...",
+    Name = "WIA HUB v9.5 Ultimate Edition",
+    LoadingTitle = "WIA HUB v9.5 Loading...",
     LoadingSubtitle = "by whitewia / tordark",
     ConfigurationSaving = { Enabled = false },
     Discord = { Enabled = false },
@@ -100,14 +104,14 @@ local VisualsTab = Window:CreateTab("Visuals & ESP", 4483345998)
 local MovementTab = Window:CreateTab("Movement & Cam", 4483345998)
 local MiscTab = Window:CreateTab("Misc & Utilities", 4483362458)
 
--- ========== PLAYER LIST & SPECTATE UI ==========
+-- ========== PLAYER LIST & CONTROLS UI ==========
 local PlayerListGui = Instance.new("ScreenGui")
-PlayerListGui.Name = "WiaPlayerList_v90"
+PlayerListGui.Name = "WiaPlayerList_v95"
 PlayerListGui.Parent = CoreGui
 PlayerListGui.Enabled = false
 
 local PlayerListMain = Instance.new("Frame")
-PlayerListMain.Size = UDim2.new(0, 280, 0, 420)
+PlayerListMain.Size = UDim2.new(0, 310, 0, 450)
 PlayerListMain.Position = UDim2.new(0, 360, 0, 10)
 PlayerListMain.BackgroundColor3 = Color3.fromRGB(10, 10, 25)
 PlayerListMain.BackgroundTransparency = 0.3
@@ -118,7 +122,7 @@ PlayerListMain.Parent = PlayerListGui
 
 local PlayerListTitle = Instance.new("TextLabel")
 PlayerListTitle.Size = UDim2.new(1, 0, 0, 30)
-PlayerListTitle.Text = "PLAYER LIST / SPECTATE / AIM"
+PlayerListTitle.Text = "PLAYER CONTROLS (TP / SPEC / AIM)"
 PlayerListTitle.TextColor3 = Color3.fromRGB(180, 0, 255)
 PlayerListTitle.TextScaled = true
 PlayerListTitle.BackgroundTransparency = 1
@@ -126,7 +130,7 @@ PlayerListTitle.Font = Enum.Font.GothamBold
 PlayerListTitle.Parent = PlayerListMain
 
 local playerListScrollingFrame = Instance.new("ScrollingFrame")
-playerListScrollingFrame.Size = UDim2.new(1, -10, 1, -65)
+playerListScrollingFrame.Size = UDim2.new(1, -10, 1, -85)
 playerListScrollingFrame.Position = UDim2.new(0, 5, 0, 35)
 playerListScrollingFrame.BackgroundTransparency = 1
 playerListScrollingFrame.BorderSizePixel = 0
@@ -140,13 +144,14 @@ PlayerListContainer.BackgroundTransparency = 1
 PlayerListContainer.Parent = playerListScrollingFrame
 
 local TargetStatus = Instance.new("TextLabel")
-TargetStatus.Size = UDim2.new(1, -20, 0, 25)
-TargetStatus.Position = UDim2.new(0, 10, 1, -28)
+TargetStatus.Size = UDim2.new(1, -20, 0, 45)
+TargetStatus.Position = UDim2.new(0, 10, 1, -48)
 TargetStatus.BackgroundTransparency = 1
-TargetStatus.Text = "Target: Auto | Spec: None"
+TargetStatus.Text = "L-Click: TP | R-Click: Aim Target | Middle/Btn: Spec\nTarget: Auto | Spec: None"
 TargetStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
 TargetStatus.Font = Enum.Font.Gotham
-TargetStatus.TextSize = 11
+TargetStatus.TextSize = 10
+TargetStatus.TextWrapped = true
 TargetStatus.Parent = PlayerListMain
 
 local function makeDraggable(frame)
@@ -180,36 +185,83 @@ local function updatePlayerList()
 
     for _, plr in pairs(players) do
         if plr ~= LocalPlayer then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, 0, 0, 25)
-            btn.Position = UDim2.new(0, 0, 0, y)
-            btn.Text = plr.Name .. " [TP] [SPEC] [AIM]"
-            btn.TextColor3 = Color3.fromRGB(255,255,255)
-            btn.BackgroundColor3 = (aimbotSelectedTarget == plr) and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40,40,55)
-            btn.BorderSizePixel = 0
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 10
-            btn.Parent = PlayerListContainer
+            local row = Instance.new("Frame")
+            row.Size = UDim2.new(1, 0, 0, 28)
+            row.Position = UDim2.new(0, 0, 0, y)
+            row.BackgroundTransparency = 1
+            row.Parent = PlayerListContainer
 
-            -- Left Click: Teleport
-            btn.MouseButton1Click:Connect(function()
+            local nameBtn = Instance.new("TextButton")
+            nameBtn.Size = UDim2.new(0.45, 0, 1, 0)
+            nameBtn.Text = plr.Name
+            nameBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            nameBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+            nameBtn.BorderSizePixel = 0
+            nameBtn.Font = Enum.Font.GothamMedium
+            nameBtn.TextSize = 10
+            nameBtn.Parent = row
+
+            local tpBtn = Instance.new("TextButton")
+            tpBtn.Size = UDim2.new(0.17, 0, 1, 0)
+            tpBtn.Position = UDim2.new(0.46, 0, 0, 0)
+            tpBtn.Text = "TP"
+            tpBtn.TextColor3 = Color3.fromRGB(200, 255, 200)
+            tpBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+            tpBtn.BorderSizePixel = 0
+            tpBtn.Font = Enum.Font.GothamBold
+            tpBtn.TextSize = 10
+            tpBtn.Parent = row
+
+            local aimBtn = Instance.new("TextButton")
+            aimBtn.Size = UDim2.new(0.17, 0, 1, 0)
+            aimBtn.Position = UDim2.new(0.64, 0, 0, 0)
+            aimBtn.Text = (aimbotSelectedTarget == plr) and "AIM+" or "AIM"
+            aimBtn.TextColor3 = Color3.fromRGB(220, 180, 255)
+            aimBtn.BackgroundColor3 = (aimbotSelectedTarget == plr) and Color3.fromRGB(80, 20, 120) or Color3.fromRGB(60, 30, 80)
+            aimBtn.BorderSizePixel = 0
+            aimBtn.Font = Enum.Font.GothamBold
+            aimBtn.TextSize = 10
+            aimBtn.Parent = row
+
+            local specBtn = Instance.new("TextButton")
+            specBtn.Size = UDim2.new(0.17, 0, 1, 0)
+            specBtn.Position = UDim2.new(0.82, 0, 0, 0)
+            specBtn.Text = (spectateTarget == plr) and "SPEC+" or "SPEC"
+            specBtn.TextColor3 = Color3.fromRGB(255, 220, 150)
+            specBtn.BackgroundColor3 = (spectateTarget == plr) and Color3.fromRGB(120, 80, 20) or Color3.fromRGB(70, 50, 20)
+            specBtn.BorderSizePixel = 0
+            specBtn.Font = Enum.Font.GothamBold
+            specBtn.TextSize = 10
+            specBtn.Parent = row
+
+            -- Button actions
+            tpBtn.MouseButton1Click:Connect(function()
                 if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
                 end
             end)
 
-            -- Right Click: Set Aimbot Target & Spectate Toggle Cycle
-            btn.MouseButton2Click:Connect(function()
+            aimBtn.MouseButton1Click:Connect(function()
+                if aimbotSelectedTarget == plr then
+                    aimbotSelectedTarget = nil
+                else
+                    aimbotSelectedTarget = plr
+                end
+                TargetStatus.Text = "L-Click: TP | R-Click: Aim Target | Btn: Spec\nTarget: " .. (aimbotSelectedTarget and aimbotSelectedTarget.Name or "Auto") .. " | Spec: " .. (spectateTarget and spectateTarget.Name or "None")
+                updatePlayerList()
+            end)
+
+            specBtn.MouseButton1Click:Connect(function()
                 if spectateTarget == plr then
                     spectateTarget = nil
                 else
                     spectateTarget = plr
                 end
-                TargetStatus.Text = "Target: " .. (aimbotSelectedTarget and aimbotSelectedTarget.Name or "Auto") .. " | Spec: " .. (spectateTarget and spectateTarget.Name or "None")
+                TargetStatus.Text = "L-Click: TP | R-Click: Aim Target | Btn: Spec\nTarget: " .. (aimbotSelectedTarget and aimbotSelectedTarget.Name or "Auto") .. " | Spec: " .. (spectateTarget and spectateTarget.Name or "None")
                 updatePlayerList()
             end)
 
-            y = y + 27
+            y = y + 31
         end
     end
 
@@ -281,16 +333,40 @@ CombatTab:CreateToggle({ Name = "Aimbot FOV Circle", CurrentValue = true, Callba
 CombatTab:CreateSlider({ Name = "Aimbot FOV", Range = {10, 400}, Increment = 5, CurrentValue = 90, Callback = function(v) aimbotFOV = v end })
 CombatTab:CreateSlider({ Name = "Aimbot Smoothness", Range = {1, 20}, Increment = 1, CurrentValue = 5, Callback = function(v) aimbotSmoothness = v end })
 CombatTab:CreateToggle({ Name = "Triggerbot (AutoShot)", CurrentValue = false, Callback = function(v) triggerbotEnabled = v end })
-CombatTab:CreateToggle({ Name = "Hitbox Expander", CurrentValue = false, Callback = function(v) hitboxEnabled = v end })
+CombatTab:CreateToggle({ Name = "Hitbox Expander", CurrentValue = false, Callback = function(v)
+    hitboxEnabled = v
+    if not v then
+        for plr, size in pairs(originalHitboxSizes) do
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                plr.Character.HumanoidRootPart.Size = size
+                plr.Character.HumanoidRootPart.Transparency = 1
+            end
+        end
+        originalHitboxSizes = {}
+    end
+end })
 CombatTab:CreateSlider({ Name = "Hitbox Size", Range = {2, 20}, Increment = 1, CurrentValue = 5, Callback = function(v) hitboxSize = v end })
 
 -- ========== VISUALS TAB ==========
 VisualsTab:CreateToggle({ Name = "ESP Boxes", CurrentValue = true, Callback = function(v) espBoxEnabled = v end })
 VisualsTab:CreateToggle({ Name = "ESP Tracers", CurrentValue = true, Callback = function(v) espTracerEnabled = v end })
 VisualsTab:CreateToggle({ Name = "ESP Names", CurrentValue = true, Callback = function(v) espNamesEnabled = v end })
-VisualsTab:CreateToggle({ Name = "ESP Distance & HP", CurrentValue = true, Callback = function(v) espDistanceEnabled = v espHealthEnabled = v end })
-VisualsTab:CreateToggle({ Name = "Skeleton ESP (Fixed)", CurrentValue = true, Callback = function(v) skeletonEspEnabled = v end })
-VisualsTab:CreateToggle({ Name = "Wallhack (Highlight)", CurrentValue = false, Callback = function(v) wallhackEnabled = v end })
+VisualsTab:CreateToggle({ Name = "ESP Distance & HP", CurrentValue = true, Callback = function(v)
+    espDistanceEnabled = v
+    espHealthEnabled = v
+end })
+VisualsTab:CreateToggle({ Name = "Skeleton ESP", CurrentValue = true, Callback = function(v) skeletonEspEnabled = v end })
+VisualsTab:CreateToggle({ Name = "Wallhack (Highlight)", CurrentValue = false, Callback = function(v)
+    wallhackEnabled = v
+    if not v then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr.Character then
+                local hl = plr.Character:FindFirstChild("WIA_WH")
+                if hl then hl:Destroy() end
+            end
+        end
+    end
+end })
 VisualsTab:CreateToggle({ Name = "FullBright", CurrentValue = false, Callback = function(v)
     fullBrightEnabled = v
     if v then
@@ -355,10 +431,12 @@ MovementTab:CreateSlider({ Name = "Walk Speed", Range = {16, 200}, Increment = 1
         LocalPlayer.Character.Humanoid.WalkSpeed = v
     end
 end })
-MovementTab:CreateSlider({ Name = "Jump Power", Range = {50, 200}, Increment = 5, CurrentValue = 50, Callback = function(v)
+MovementTab:CreateSlider({ Name = "Jump Power", Range = {50, 300}, Increment = 5, CurrentValue = 50, Callback = function(v)
     jumpPowerValue = v
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.JumpPower = v
+        local hum = LocalPlayer.Character.Humanoid
+        hum.UseJumpPower = true
+        hum.JumpPower = v
     end
 end })
 
@@ -373,7 +451,7 @@ MiscTab:CreateToggle({ Name = "Anti-Void", CurrentValue = false, Callback = func
 MiscTab:CreateToggle({ Name = "Anti-Fall Damage", CurrentValue = false, Callback = function(v) antiFallEnabled = v end })
 MiscTab:CreateToggle({ Name = "Anti-AFK", CurrentValue = false, Callback = function(v) antiAFKEnabled = v end })
 
-MiscTab:CreateToggle({ Name = "Player List / Spectate GUI", CurrentValue = false, Callback = function(v)
+MiscTab:CreateToggle({ Name = "Player Controls GUI", CurrentValue = false, Callback = function(v)
     playerListEnabled = v
     PlayerListGui.Enabled = v
     if v then updatePlayerList() end
@@ -401,7 +479,7 @@ end })
 
 -- ========== ENHANCED SYSTEMS & LOOPS ==========
 
--- Bulletproof Optimized Noclip (Forces collision disabled across Character descendants seamlessly)
+-- Noclip loop
 RunService.Stepped:Connect(function()
     if noclipEnabled and LocalPlayer.Character then
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
@@ -440,7 +518,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Spectate System Loop
+-- Spectate Loop
 RunService.RenderStepped:Connect(function()
     if spectateTarget and spectateTarget.Character and spectateTarget.Character:FindFirstChild("HumanoidRootPart") then
         spectateEnabled = true
@@ -455,7 +533,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Aimbot Engine
+-- Aimbot Target Resolver
 local function getAimbotTarget()
     if aimbotSelectedTarget and aimbotSelectedTarget.Character and aimbotSelectedTarget.Character:FindFirstChild("Head") then
         return aimbotSelectedTarget
@@ -507,7 +585,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Flight, CFrame Speed, Bhop, Spinbot, Godmode, Hitboxes
+-- Movement & Hitboxes loop
 RunService.Heartbeat:Connect(function()
     if flightEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and bodyVelocity then
         local root = LocalPlayer.Character.HumanoidRootPart
@@ -549,8 +627,12 @@ RunService.Heartbeat:Connect(function()
     if hitboxEnabled then
         for _, plr in pairs(Players:GetPlayers()) do
             if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                plr.Character.HumanoidRootPart.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                plr.Character.HumanoidRootPart.Transparency = 0.7
+                local hrp = plr.Character.HumanoidRootPart
+                if not originalHitboxSizes[plr] then
+                    originalHitboxSizes[plr] = hrp.Size
+                end
+                hrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+                hrp.Transparency = 0.7
             end
         end
     end
@@ -613,7 +695,7 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- Advanced ESP & Fixed Scale Skeleton Engine (Accurate R15 / R6 mapping)
+-- Advanced ESP & Render Engine
 local PURPLE = Color3.fromRGB(180, 0, 255)
 RunService.RenderStepped:Connect(function()
     for i = #espLines, 1, -1 do espLines[i]:Remove() espLines[i] = nil end
@@ -681,7 +763,6 @@ RunService.RenderStepped:Connect(function()
                             end
                         end
                     end
-                    -- Rig mapping verification (Supports R15 and R6 properly)
                     if char:FindFirstChild("UpperTorso") then
                         drawBone(char.Head, char.UpperTorso)
                         drawBone(char.UpperTorso, char.LowerTorso)
@@ -706,9 +787,9 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
 
-                if espNamesEnabled or espDistanceEnabled then
+                if espNamesEnabled or espDistanceEnabled or espHealthEnabled then
                     local text = Drawing.new("Text")
-                    text.Position = Vector2.new(pos.X, pos.Y - size/2 - 15)
+                    text.Position = Vector2.new(pos.X, pos.Y - size/2 - 18)
                     text.Size = 13
                     text.Center = true
                     text.Outline = true
@@ -747,8 +828,8 @@ RunService.Heartbeat:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "WIA HUB v9.0 Ultimate",
-    Content = "Skeleton ESP fixed, Noclip improved, Freecam & Spectate active!",
+    Title = "WIA HUB v9.5 Ultimate",
+    Content = "All bugs fixed: Hitboxes, Wallhack, JumpPower & Player List updated!",
     Duration = 5,
     Image = 4483362458,
 })
