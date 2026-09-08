@@ -958,237 +958,425 @@ Image = 4483362458,
 
 ---
 
--- Вкладка: Murder Mystery 2 (MM2) ULTIMATE
+-- ================================================================= --
+-- 🔪 ULTIMATE MM2 TAB (FULL FUNCTIONAL & FIXED)
+-- ================================================================= --
+local MM2Tab = Window:CreateTab("🔪 MM2 Master", 4483362458)
 
-local MM2Tab = Window:CreateTab("🔪 MM2 Pro", 4483362458)
-
-local MM2Visuals = MM2Tab:CreateSection("ESP и Визуалы")
+-- ------------------ ВИЗУАЛЫ (ESP) ------------------
+MM2Tab:CreateSection("👁️ ESP & Информатор")
 
 local RoleESPEnabled = false
 MM2Tab:CreateToggle({
-Name = "Role ESP (Показывать Мардера и Шерифа)",
-CurrentValue = false,
-Flag = "MM2RoleESP",
-Callback = function(Value)
-RoleESPEnabled = Value
-if not Value then
-for _, v in pairs(Players:GetPlayers()) do
-if v.Character and v.Character:FindFirstChild("MM2RoleHighlight") then
-v.Character.MM2RoleHighlight:Destroy()
-end
-end
-end
-end
+    Name = "Role ESP (Мардер / Шериф / Невинный)",
+    CurrentValue = false,
+    Flag = "MM2RoleESP",
+    Callback = function(Value)
+        RoleESPEnabled = Value
+        if not Value then
+            for _, v in pairs(Players:GetPlayers()) do
+                if v.Character and v.Character:FindFirstChild("MM2RoleHighlight") then
+                    v.Character.MM2RoleHighlight:Destroy()
+                end
+            end
+        end
+    end
+})
+
+local RoleTracersEnabled = false
+MM2Tab:CreateToggle({
+    Name = "Трейсеры к Мардеру и Шерифу",
+    CurrentValue = false,
+    Flag = "MM2RoleTracers",
+    Callback = function(Value) RoleTracersEnabled = Value end
 })
 
 local GunDropESPEnabled = false
 MM2Tab:CreateToggle({
-Name = "ESP на упавший пистолет (Gun Drop)",
-CurrentValue = false,
-Flag = "MM2GunESP",
-Callback = function(Value)
-GunDropESPEnabled = Value
-if not Value and workspace:FindFirstChild("GunDrop") and workspace.GunDrop:FindFirstChild("GunHighlight") then
-workspace.GunDrop.GunHighlight:Destroy()
-end
-end
+    Name = "ESP на упавший пистолет (Gun Drop)",
+    CurrentValue = false,
+    Flag = "MM2GunESP",
+    Callback = function(Value) GunDropESPEnabled = Value end
 })
 
-local MM2Combat = MM2Tab:CreateSection("Бой: Мардер (Murderer)")
-
-local KillAuraEnabled = false
+local CoinESPEnabled = false
 MM2Tab:CreateToggle({
-Name = "Kill Aura (Авто-удар вблизи)",
-CurrentValue = false,
-Flag = "MM2KillAura",
-Callback = function(Value) KillAuraEnabled = Value end
+    Name = "ESP на Монеты (Coins)",
+    CurrentValue = false,
+    Flag = "MM2CoinESP",
+    Callback = function(Value) CoinESPEnabled = Value end
 })
 
-MM2Tab:CreateButton({
-Name = "Kill All (Убить всех - телепорт)",
-Callback = function()
-local char = LocalPlayer.Character
-local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
+-- ------------------ АВТО-ФАРМ & УТИЛИТЫ ------------------
+MM2Tab:CreateSection("💰 Авто-Фарм и Утилиты")
 
-if not knife then  
-        Rayfield:Notify({Title = "Ошибка", Content = "У тебя нет ножа!", Duration = 3})  
-        return  
-    end  
-    if knife.Parent == LocalPlayer.Backpack then char.Humanoid:EquipTool(knife) end  
-
-    task.spawn(function()  
-        for _, v in pairs(Players:GetPlayers()) do  
-            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then  
-                char.HumanoidRootPart.CFrame = v.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1.5)  
-                task.wait(0.2)  
-                if mouse1click then mouse1click() end  
-                task.wait(0.3)  
-            end  
-        end  
-    end)  
-end
-
-})
-
-local MM2Sheriff = MM2Tab:CreateSection("Бой: Шериф (Sheriff)")
-
-local AutoShootEnabled = false
+local AutoFarmCoins = false
+local AutoFarmSpeed = 25
 MM2Tab:CreateToggle({
-Name = "Авто-выстрел в Мардера (Auto Shoot)",
-CurrentValue = false,
-Flag = "MM2AutoShoot",
-Callback = function(Value) AutoShootEnabled = Value end
+    Name = "Авто-Фарм монет (Безопасный)",
+    CurrentValue = false,
+    Flag = "MM2AutoFarm",
+    Callback = function(Value) AutoFarmCoins = Value end
 })
 
-local SilentAimMM2 = false
-MM2Tab:CreateToggle({
-Name = "Захват камеры на Мардера (Aim Lock)",
-CurrentValue = false,
-Flag = "MM2SilentAim",
-Callback = function(Value) SilentAimMM2 = Value end
+MM2Tab:CreateSlider({
+    Name = "Скорость фарма (Задержка TP)",
+    Range = {10, 50},
+    Increment = 5,
+    Suffix = " speed",
+    CurrentValue = 25,
+    Flag = "MM2FarmSpeed",
+    Callback = function(Value) AutoFarmSpeed = Value end
 })
 
 local AutoGrabGun = false
 MM2Tab:CreateToggle({
-Name = "Авто-подбор пистолета (Auto-Grab Gun)",
-CurrentValue = false,
-Flag = "MM2AutoGun",
-Callback = function(Value) AutoGrabGun = Value end
+    Name = "Авто-подбор пистолета (Auto-Grab Gun)",
+    CurrentValue = false,
+    Flag = "MM2AutoGrab",
+    Callback = function(Value) AutoGrabGun = Value end
 })
 
+MM2Tab:CreateButton({
+    Name = "⚡ Мгновенно ТП к пистолету",
+    Callback = function()
+        local gunDrop = getGunDrop()
+        local char = LocalPlayer.Character
+        if gunDrop and char and char:FindFirstChild("HumanoidRootPart") then
+            local targetPos = gunDrop:IsA("Model") and (gunDrop.PrimaryPart or gunDrop:FindFirstChildWhichIsA("BasePart")) or gunDrop
+            if targetPart then
+                char.HumanoidRootPart.CFrame = targetPart.CFrame * CFrame.new(0, 2, 0)
+            end
+        else
+            Rayfield:Notify({Title = "MM2", Content = "Упавший пистолет не найден!", Duration = 3})
+        end
+    end
+})
 
----
+local AntiKnifeEnabled = false
+MM2Tab:CreateToggle({
+    Name = "Anti-Knife (Авто-уклонение от Мардера)",
+    CurrentValue = false,
+    Flag = "MM2AntiKnife",
+    Callback = function(Value) AntiKnifeEnabled = Value end
+})
 
--- ФОНОВЫЕ ЦИКЛЫ ДЛЯ MM2 (БЕЗ ЛАГОВ)
+-- ------------------ БОЙ: ШЕРИФ ------------------
+MM2Tab:CreateSection("🎯 Бой: Шериф / Герой")
 
--- 1. Роли и Подсветка (ESP)
-task.spawn(function()
-while task.wait(0.5) do
--- Role ESP
-if RoleESPEnabled then
-for _, player in pairs(Players:GetPlayers()) do
-if player ~= LocalPlayer and player.Character then
-local char = player.Character
-local bp = player:FindFirstChild("Backpack")
-local hasKnife = (char and char:FindFirstChild("Knife")) or (bp and bp:FindFirstChild("Knife"))
-local hasGun = (char and char:FindFirstChild("Gun")) or (bp and bp:FindFirstChild("Gun")) or (char and char:FindFirstChild("Revolver")) or (bp and bp:FindFirstChild("Revolver"))
+local TrueSilentAimMM2 = false
+MM2Tab:CreateToggle({
+    Name = "True Silent Aim (Стрелять в стену -> Попадает в Мардера)",
+    CurrentValue = false,
+    Flag = "MM2TrueSilentAim",
+    Callback = function(Value) TrueSilentAimMM2 = Value end
+})
 
-local color = nil  
-                if hasKnife then color = Color3.fromRGB(255, 0, 0)  
-                elseif hasGun then color = Color3.fromRGB(0, 150, 255) end  
+local SilentAimMM2 = false
+MM2Tab:CreateToggle({
+    Name = "Aim Lock (Захват камеры на Мардера)",
+    CurrentValue = false,
+    Flag = "MM2AimLock",
+    Callback = function(Value) SilentAimMM2 = Value end
+})
 
-                if color then  
-                    local hl = char:FindFirstChild("MM2RoleHighlight")  
-                    if not hl then  
-                        hl = Instance.new("Highlight", char)  
-                        hl.Name = "MM2RoleHighlight"  
-                        hl.FillTransparency = 0.5  
-                        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop  
-                    end  
-                    hl.FillColor = color  
-                    hl.OutlineColor = color  
-                else  
-                    if char:FindFirstChild("MM2RoleHighlight") then char.MM2RoleHighlight:Destroy() end  
+local AutoShootEnabled = false
+MM2Tab:CreateToggle({
+    Name = "Auto Shoot (Авто-выстрел в Мардера)",
+    CurrentValue = false,
+    Flag = "MM2AutoShoot",
+    Callback = function(Value) AutoShootEnabled = Value end
+})
+
+-- ------------------ БОЙ: МАРДЕР ------------------
+MM2Tab:CreateSection("🔪 Бой: Мардер")
+
+local KillAuraEnabled = false
+MM2Tab:CreateToggle({
+    Name = "Kill Aura (Авто-удар ножом вокруг)",
+    CurrentValue = false,
+    Flag = "MM2KillAura",
+    Callback = function(Value) KillAuraEnabled = Value end
+})
+
+MM2Tab:CreateButton({
+    Name = "☠️ KILL ALL (Убить всех за Мардера)",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+        local knife = char:FindFirstChild("Knife") or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("Knife"))
+        if not knife then  
+            Rayfield:Notify({Title = "Ошибка", Content = "У тебя нет ножа Мардера!", Duration = 3})  
+            return  
+        end  
+
+        if knife.Parent == LocalPlayer.Backpack then 
+            char.Humanoid:EquipTool(knife) 
+        end  
+
+        task.spawn(function()  
+            for _, v in pairs(Players:GetPlayers()) do  
+                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then  
+                    local targetHrp = v.Character.HumanoidRootPart
+                    -- Быстрый телепорт за спину и попытка атаки
+                    for i = 1, 3 do
+                        char.HumanoidRootPart.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 1.2)
+                        if knife:FindFirstChild("Stab") then
+                            knife.Stab:FireServer()
+                        end
+                        if mouse1click then mouse1click() end
+                        task.wait(0.05)
+                    end
                 end  
             end  
-        end  
-    end  
+        end)  
+    end
+})
 
-    -- Gun Drop ESP  
-    if GunDropESPEnabled then  
-        local gunDrop = workspace:FindFirstChild("GunDrop")  
-        if gunDrop and not gunDrop:FindFirstChild("GunHighlight") then  
-            local hl = Instance.new("Highlight", gunDrop)  
-            hl.Name = "GunHighlight"  
-            hl.FillColor = Color3.fromRGB(0, 255, 0)  
-            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop  
-        end  
-    end  
+-- ================================================================= --
+-- ⚙️ MM2 CORE ENGINE & BACKGROUND LOOPS
+-- ================================================================= --
+
+-- Поиск упавшего пистолета
+local function getGunDrop()
+    for _, obj in pairs(workspace:GetChildren()) do
+        if obj.Name == "GunDrop" or (obj:IsA("Model") and obj.Name:lower():find("gun")) then
+            return obj
+        end
+    end
+    for _, child in pairs(workspace:GetDescendants()) do
+        if child.Name == "GunDrop" then
+            return child.Parent:IsA("Model") and child.Parent or child
+        end
+    end
+    return nil
 end
 
+-- Поиск роли игрока
+local function getPlayerRole(player)
+    if not player or not player.Character then return "Innocent" end
+    local char = player.Character
+    local bp = player:FindFirstChild("Backpack")
+
+    if char:FindFirstChild("Knife") or (bp and bp:FindFirstChild("Knife")) then
+        return "Murderer"
+    elseif char:FindFirstChild("Gun") or (bp and bp:FindFirstChild("Gun")) or char:FindFirstChild("Revolver") or (bp and bp:FindFirstChild("Revolver")) then
+        return "Sheriff"
+    end
+    return "Innocent"
+end
+
+-- 1. ЦВЕТНОЙ ROLE ESP & GUN ESP
+task.spawn(function()
+    while task.wait(0.4) do
+        -- Role ESP
+        if RoleESPEnabled then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    local role = getPlayerRole(p)
+                    local color = nil
+                    
+                    if role == "Murderer" then 
+                        color = Color3.fromRGB(255, 30, 30) 
+                    elseif role == "Sheriff" then 
+                        color = Color3.fromRGB(0, 150, 255) 
+                    end
+
+                    if color then
+                        local hl = p.Character:FindFirstChild("MM2RoleHighlight")
+                        if not hl then
+                            hl = Instance.new("Highlight")
+                            hl.Name = "MM2RoleHighlight"
+                            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                            hl.Parent = p.Character
+                        end
+                        hl.FillColor = color
+                        hl.OutlineColor = color
+                        hl.FillTransparency = 0.4
+                    else
+                        if p.Character:FindFirstChild("MM2RoleHighlight") then 
+                            p.Character.MM2RoleHighlight:Destroy() 
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Gun Drop ESP
+        if GunDropESPEnabled then
+            local gunDrop = getGunDrop()
+            if gunDrop then
+                local hl = gunDrop:FindFirstChild("GunHighlight")
+                if not hl then
+                    hl = Instance.new("Highlight")
+                    hl.Name = "GunHighlight"
+                    hl.FillColor = Color3.fromRGB(255, 255, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = gunDrop
+                end
+            end
+        end
+    end
 end)
 
--- 2. Боевые функции: Kill Aura, Auto-Grab, Aim Lock, Auto Shoot
+-- 2. ИСПРАВЛЕННЫЙ AUTO-GRAB GUN
+task.spawn(function()
+    while task.wait(0.1) do
+        if AutoGrabGun then
+            local gunDrop = getGunDrop()
+            local char = LocalPlayer.Character
+            if gunDrop and char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                local gunPart = gunDrop:IsA("Model") and (gunDrop.PrimaryPart or gunDrop:FindFirstChildWhichIsA("BasePart")) or gunDrop
+
+                if gunPart and gunPart:IsA("BasePart") then
+                    -- Метод 1: Симуляция касания (Touch)
+                    if firetouchinterest then
+                        pcall(function()
+                            firetouchinterest(hrp, gunPart, 0)
+                            task.wait()
+                            firetouchinterest(hrp, gunPart, 1)
+                        end)
+                    end
+                    -- Метод 2: Микро-телепорт на пистолет
+                    pcall(function()
+                        hrp.CFrame = gunPart.CFrame + Vector3.new(0, 0.5, 0)
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+-- 3. АВТО-ФАРМ МОНЕТ (SAFE AUTO-FARM)
+task.spawn(function()
+    while task.wait(0.2) do
+        if AutoFarmCoins then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                -- Поиск контейнера с монетами
+                local coinsContainer = workspace:FindFirstChild("Normal") and workspace.Normal:FindFirstChild("CoinContainer") or workspace:FindFirstChild("CoinContainer")
+                
+                if coinsContainer then
+                    for _, coin in pairs(coinsContainer:GetChildren()) do
+                        if not AutoFarmCoins then break end
+                        if coin:IsA("BasePart") or coin:IsA("Model") then
+                            local part = coin:IsA("Model") and coin.PrimaryPart or coin
+                            if part and coin.Transparency < 0.9 then
+                                -- Телепорт к монете
+                                char.HumanoidRootPart.CFrame = part.CFrame
+                                task.wait(1 / AutoFarmSpeed)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- 4. ANTI-KNIFE (АВТО-УКЛОНЕНИЕ ОТ МАРДЕРА)
+RunService.Heartbeat:Connect(function()
+    if AntiKnifeEnabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local mHrp = p.Character.HumanoidRootPart
+                    local dist = (char.HumanoidRootPart.Position - mHrp.Position).Magnitude
+                    
+                    -- Если мардер ближе 15 студов - отпрыгиваем назад
+                    if dist < 15 then
+                        local escapeDir = (char.HumanoidRootPart.Position - mHrp.Position).Unit
+                        char.HumanoidRootPart.CFrame = CFrame.new(char.HumanoidRootPart.Position + escapeDir * 10)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- 5. БОЕВОЙ ЦИКЛ: AIM LOCK, AUTO SHOOT, KILL AURA
 RunService.RenderStepped:Connect(function()
-local char = LocalPlayer.Character
-if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
 
--- Поиск Мардера для Аима и Стрельбы  
-local murderer = nil  
-for _, p in pairs(Players:GetPlayers()) do  
-    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then  
-        if p.Character:FindFirstChild("Knife") or (p.Backpack and p.Backpack:FindFirstChild("Knife")) then  
-            murderer = p.Character  
-            break  
-        end  
-    end  
-end  
+    -- Поиск Мардера
+    local murdererChar = nil
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character then
+            murdererChar = p.Character
+            break
+        end
+    end
 
--- Захват камеры (Aim Lock на Мардера)  
-if SilentAimMM2 and murderer and murderer:FindFirstChild("Head") then  
-    local gun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")  
-    if gun then  
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, murderer.Head.Position)  
-    end  
-end  
+    -- Aim Lock
+    if SilentAimMM2 and murdererChar and murdererChar:FindFirstChild("Head") then
+        local hasGun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")
+        if hasGun then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, murdererChar.Head.Position)
+        end
+    end
 
--- Авто-выстрел в Мардера  
-if AutoShootEnabled and murderer and murderer:FindFirstChild("HumanoidRootPart") then  
-    local gun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")  
-    if gun then  
-        local dist = (char.HumanoidRootPart.Position - murderer.HumanoidRootPart.Position).Magnitude  
-        if dist < 45 then -- Стреляем, если Мардер ближе 45 стадов  
-            if mouse1click then mouse1click() end  
-        end  
-    end  
-end  
+    -- Auto Shoot
+    if AutoShootEnabled and murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") then
+        local hasGun = char:FindFirstChild("Gun") or char:FindFirstChild("Revolver")
+        if hasGun then
+            local dist = (char.HumanoidRootPart.Position - murdererChar.HumanoidRootPart.Position).Magnitude
+            if dist < 60 then
+                if mouse1click then mouse1click() end
+            end
+        end
+    end
 
--- Kill Aura (Автоматический удар ножом вблизи)  
-if KillAuraEnabled then  
-    local knife = char:FindFirstChild("Knife")  
-    if knife then  
-        for _, p in pairs(Players:GetPlayers()) do  
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then  
-                local dist = (char.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude  
-                if dist < 12 then -- Дистанция удара  
-                    if mouse1click then mouse1click() end  
-                end  
-            end  
-        end  
-    end  
-end
-
+    -- Kill Aura (Для Мардера)
+    if KillAuraEnabled then
+        local knife = char:FindFirstChild("Knife")
+        if knife then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (char.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                    if dist < 12 then
+                        if knife:FindFirstChild("Stab") then knife.Stab:FireServer() end
+                        if mouse1click then mouse1click() end
+                    end
+                end
+            end
+        end
+    end
 end)
 
--- Улучшенный Авто-подбор пистолета (Auto-Grab Gun)
-task.spawn(function()
-while task.wait(0.1) do
-if AutoGrabGun then
-local gunDrop = workspace:FindFirstChild("GunDrop")
-local char = LocalPlayer.Character
-if gunDrop and char and char:FindFirstChild("HumanoidRootPart") then
-local hrp = char.HumanoidRootPart
+-- ================================================================= --
+-- METATABLE HOOK: TRUE SILENT AIM (ПЕРЕХВАТ ВЫСТРЕЛА)
+-- ================================================================= --
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
 
--- Метод 1: Эмуляция касания (Работает на 90% экзекьюторов)  
-            if firetouchinterest then  
-                firetouchinterest(hrp, gunDrop, 0)  
-                task.wait()  
-                firetouchinterest(hrp, gunDrop, 1)  
-            end  
+if setreadonly then setreadonly(mt, false) end
 
-            -- Метод 2: Притягиваем пистолет прямо к игроку  
-            gunDrop.CFrame = hrp.CFrame  
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
 
-            -- Метод 3: Телепорт персонажа точно на пистолет  
-            hrp.CFrame = gunDrop.CFrame * CFrame.new(0, 0.5, 0)  
+    if TrueSilentAimMM2 and tostring(self) == "ShootGun" and method == "InvokeServer" then
+        local murdererChar = nil
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and getPlayerRole(p) == "Murderer" and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                murdererChar = p.Character
+                break
+            end
+        end
 
-            task.wait(0.3) -- Небольшая пауза, чтобы сервер успел выдать пистолет  
-        end  
-    end  
-end
+        if murdererChar and murdererChar:FindFirstChild("HumanoidRootPart") then
+            -- Перенаправляем вектор выстрела прямо в Мардера с учетом его движения
+            args[1] = murdererChar.HumanoidRootPart.Position + (murdererChar.HumanoidRootPart.Velocity * 0.05)
+            return oldNamecall(self, unpack(args))
+        end
+    end
 
+    return oldNamecall(self, ...)
 end)
 
-
----
-
+if setreadonly then setreadonly(mt, true) end
