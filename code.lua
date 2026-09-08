@@ -751,7 +751,7 @@ local function SetupTriggers()
             end
         end
 
-        -- Отслеживаем создание Backpack через ChildAdded
+        -- ИСПРАВЛЕНИЕ: Отслеживание создания Backpack через ChildAdded
         TrackConnection(plr.ChildAdded:Connect(function(child)
             if child.Name == "Backpack" then
                 setupBackpackConnections()
