@@ -1,6 +1,6 @@
 -- ================================================================= --
 -- WIA HUB v12.6 :: MM2 ULTIMATE & INFINITY YIELD HYBRID
--- FINAL POLISH | OPTIMIZED | CLEAN ARCHITECTURE | FLIGHT FIXED
+-- FINAL POLISH | OPTIMIZED | CLEAN ARCHITECTURE | FIXED EVENTS
 -- ================================================================= --
 
 local Players = game:GetService("Players")
@@ -116,7 +116,7 @@ local FlyData = {
     Active = false,
 }
 
--- ========== НОВЫЕ СОСТОЯНИЯ ДЛЯ UTILITIES ==========
+-- ========== STATE FOR UTILITIES ==========
 local UtilityState = {
     TeleportTool = nil,
     SelectedPlayer = nil,
@@ -221,7 +221,7 @@ local function SetupWorkspaceWatcher()
     end
 
     TrackConnection(Workspace.DescendantAdded:Connect(onDescendantAdded))
-    TrackConnection(Workspace.DescendantRemoved:Connect(onDescendantRemoved))
+    TrackConnection(Workspace.DescendantRemoving:Connect(onDescendantRemoved))
 end
 
 SetupWorkspaceWatcher()
@@ -319,7 +319,7 @@ local function GetGunDrop()
     return nil
 end
 
--- ========== НОВЫЕ UTILITY ФУНКЦИИ ==========
+-- ========== UTILITY ФУНКЦИИ ==========
 
 local function GetPlayerList()
     local list = {}
@@ -579,7 +579,7 @@ end
 
 TrackConnection(RunService.Heartbeat:Connect(UpdateFlight))
 
--- ========== 7. УПРАВЛЕНИЕ ESP (ИНКРЕМЕНТАЛЬНОЕ) ==========
+-- ========== 7. УПРАВЛЕНИЕ ESP ==========
 
 local function UpdatePlayerESP()
     if not Settings.PlayerESP then
@@ -786,7 +786,7 @@ end
 SetupTriggers()
 
 -- ================================================================= --
--- 9. ИНТЕРФЕЙС ORION LIBRARY (ПОЛНАЯ АДАПТАЦИЯ)
+-- 9. ИНТЕРФЕЙС ORION LIBRARY
 -- ================================================================= --
 local success, err = pcall(function()
     OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
@@ -810,9 +810,7 @@ local TabMovement = Window:MakeTab({Name = "Movement", Icon = "rbxassetid://4483
 local TabCombat = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483362458", PremiumOnly = false})
 local TabIYUtils = Window:MakeTab({Name = "IY Utilities", Icon = "rbxassetid://4483362458", PremiumOnly = false})
 
--- ================================================================= --
--- ВКЛАДКА: MM2 MASTER
--- ================================================================= --
+-- MM2 MASTER
 TabMM2:AddSection({Name = "Визуалы и Подсветка (Highlight ESP)"})
 
 TabMM2:AddToggle({
@@ -894,9 +892,7 @@ TabMM2:AddToggle({
     Callback = function(v) Settings.AntiKnife = v end
 })
 
--- ================================================================= --
--- ВКЛАДКА: MOVEMENT
--- ================================================================= --
+-- MOVEMENT
 TabMovement:AddSection({Name = "Модификаторы движения"})
 
 TabMovement:AddSlider({
@@ -959,9 +955,7 @@ TabMovement:AddToggle({
     Callback = function(v) Settings.Noclip = v end
 })
 
--- ================================================================= --
--- ВКЛАДКА: COMBAT
--- ================================================================= --
+-- COMBAT
 TabCombat:AddSection({Name = "Аимбот и Киллаура"})
 
 TabCombat:AddToggle({
@@ -1009,10 +1003,7 @@ TabCombat:AddSlider({
     Callback = function(v) Settings.KillRadius = v end
 })
 
--- ================================================================= --
--- ВКЛАДКА: INFINITY YIELD UTILITIES
--- ================================================================= --
-
+-- INFINITY YIELD UTILITIES
 TabIYUtils:AddSection({Name = "Player Utilities"})
 
 local playerDropdown = TabIYUtils:AddDropdown({
@@ -1269,7 +1260,6 @@ TabIYUtils:AddButton({
     end
 })
 
--- Объявление функций полной очистки до их использования в GUI
 local FullCleanup, SafeCleanup
 
 FullCleanup = function()
@@ -1560,7 +1550,7 @@ TrackConnection(RunService.RenderStepped:Connect(function()
     end
 end))
 
--- Оптимизированный периодический цикл обновления ESP (2 раз/сек)
+-- Обновление ESP
 local lastESPUpdate = 0
 TrackConnection(RunService.Heartbeat:Connect(function()
     local now = tick()
@@ -1612,14 +1602,11 @@ TrackConnection(LocalPlayer:GetPropertyChangedSignal("Parent"):Connect(function(
 end))
 
 -- ================================================================= --
--- 12. ЗАПУСК
+-- ЗАПУСК
 -- ================================================================= --
 task.wait(0.5)
 ApplyMovementSettings()
 UpdateAllESP()
 RefreshPlayerList()
 
-Notify("WIA HUB v12.6", "Расширенная версия загружена и оптимизирована!", 5)
-
-print("WIA HUB v12.6 Loaded Successfully!")
-print("Extended version with Player List, Teleport Tool, and IY Utilities!")
+Notify("WIA HUB v12.6", "Скрипт успешно запущен без ошибок!", 5)
