@@ -1607,3 +1607,58 @@ UpdateAllESP()
 RefreshPlayerList()
 
 Notify("WIA HUB v12.6", "Скрипт полностью исправлен и готов к работе!", 5)
+
+-- Загрузка интерфейса Orion Library через рабочее зеркало
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
+
+-- Создание главного окна
+local Window = OrionLib:MakeWindow({
+    Name = "WIA Script Hub",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "WiaConfig"
+})
+
+-- Вкладка "Главная"
+local MainTab = Window:MakeTab({
+    Name = "Main",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- Секция функций
+MainTab:AddSection({
+    Name = "Основные функции"
+})
+
+-- Кнопка для теста
+MainTab:AddButton({
+    Name = "Проверить работу",
+    Callback = function()
+        OrionLib:MakeNotification({
+            Name = "Успешно!",
+            Content = "WIA Script работает без ошибок 404!",
+            Image = "rbxassetid://4483345998",
+            Time = 5
+        })
+    end    
+})
+
+-- Слайдер для скорости ходьбы
+MainTab:AddSlider({
+    Name = "Скорость (WalkSpeed)",
+    Min = 16,
+    Max = 100,
+    Default = 16,
+    Color = Color3.fromRGB(255,255,255),
+    Increment = 1,
+    ValueName = "Speed",
+    Callback = function(Value)
+        if game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+            game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end    
+})
+
+-- Инициализация графического интерфейса
+OrionLib:Init()
