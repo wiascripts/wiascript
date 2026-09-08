@@ -1,1146 +1,1868 @@
 -- ================================================================= --
--- WIA HUB v11.0.2 RAYFIELD EDITION :: FULLY FIXED
+-- WIA HUB v11 :: RAYFIELD EDITION
+-- Full UI Architecture / Configuration / Notifications / Cleanup
 -- ================================================================= --
-
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
--- ========== VARIABLES ==========
-local Settings = {
-    Flight = false,
-    FlySpeed = 50,
+-- ================================================================= --
+-- RAYFIELD
+-- ================================================================= --
+
+local Rayfield = loadstring(game:HttpGet(
+    "https://sirius.menu/rayfield"
+))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "WIA HUB v11",
+    LoadingTitle = "WIA HUB",
+    LoadingSubtitle = "Rayfield Edition",
+
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "WIAHUB",
+        FileName = "Settings"
+    },
+
+    Discord = {
+        Enabled = false
+    },
+
+    KeySystem = false
+})
+
+-- ================================================================= --
+-- STATE
+-- ================================================================= --
+
+local State = {
+    FullBright = false,
+    NoFog = false,
+    RemoveColorCorrection = false,
+    CameraFOV = 70,
+    Notifications = true,
+    Debug = false,
+
+    -- Combat
+    Aimbot = false,
+    AimbotFOV = 90,
+    AimbotSmoothness = 1,
+    AimbotFOVCircle = false,
+    AimbotTarget = nil,
+    Triggerbot = false,
+    HitboxExpander = false,
+    HitboxSize = 1,
+
+    -- Visuals
+    ESPBox = false,
+    ESPTracer = false,
+    ESPName = false,
+    ESPDistance = false,
+    ESPHealth = false,
+    ESPColor = Color3.fromRGB(255, 255, 255),
+    RainbowMode = false,
+    Wallhack = false,
+
+    -- Movement
+    Fly = false,
     Noclip = false,
     Speed = 16,
     JumpPower = 50,
     InfiniteJump = false,
     Bhop = false,
     Spinbot = false,
-    SpinSpeed = 20,
     CFrameSpeed = false,
-    CFrameMultiplier = 2,
+    CFrameSpeedMultiplier = 2,
 
-    Aimbot = false,
-    AimbotFOV = 90,
-    Smoothness = 5,
-    Triggerbot = false,
-    HitboxExpander = false,
-    HitboxSize = 5,
-
-    ESPBox = true,
-    ESPTracer = true,
-    ESPName = true,
-    ESPDistance = true,
-    ESPHealth = true,
-    Wallhack = false,
-    CoinESP = true,
-    GunESP = true,
-
-    AutoFarm = false,
-    FarmSpeed = 25,
-    AutoGrabGun = false,
+    -- MM2
+    GunTeleport = false,
     SilentAim = false,
     AutoShoot = false,
     KillAura = false,
-    KillRadius = 12,
-    AntiKnife = false,
-    GunTeleport = false,
-
-    FullBright = false,
-    NoFog = false,
-    CamFOV = 70,
-    DisableYellowTint = true,
-
-    AntiAFK = false,
+    KillAuraRange = 20,
     AntiVoid = false,
     AntiFall = false,
+    AntiAFK = false,
     Godmode = false,
+    TeleportTool = false,
+
+    -- Player Utilities
+    PlayerList = false,
+
+    -- Automation
     AutoClicker = false,
-    ClickDelay = 100,
+    AutoClickerDelay = 100,
     ChatSpam = false,
-    SpamMessage = "WIA HUB ON TOP",
-    SpamDelay = 5,
+    ChatSpamMessage = "WIA HUB ON TOP",
+    ChatSpamDelay = 5,
 }
 
--- ========== STATE SAVE ==========
-local Original = {
-    WalkSpeed = {},
-    JumpPower = {},
-    CanCollide = {},
-    Size = {},
-    Transparency = {},
-    Brightness = nil,
-    Ambient = nil,
-    FogEnd = nil,
+local Connections = {}
+local ESPDrawings = {}
+local AimbotConnection = nil
+local ESPConnection = nil
+local MovementConnection = nil
+local CombatConnection = nil
+local MM2Connection = nil
+local AntiVoidConnection = nil
+local AntiAFKConnection = nil
+local SpinbotConnection = nil
+local WallhackConnection = nil
+local NoclipConnection = nil
+local InfiniteJumpConnection = nil
+local BhopConnection = nil
+local AntiFallConnection = nil
+local TriggerbotConnection = nil
+local NamecallHook = nil
+local oldNamecall = nil
+local CFrameSpeedConnection = nil
+local GodmodeConnection = nil
+local TeleportToolInstance = nil
+local FOVCircle = nil
+local PlayerListButtons = {}
+
+-- Storage for original values
+local originalLighting = {
+    Brightness = Lighting.Brightness,
+    ClockTime = Lighting.ClockTime,
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
 }
+local originalTransparencies = {}
+local originalHitboxSizes = {}
+local originalColorCorrectionStates = {}
+local AntiFallHumanoidConnections = {}
+local AntiAFKLastAction = nil
 
-local function SaveCharacter(char)
-    if not char then return end
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if not Original.CanCollide[part] then
-                Original.CanCollide[part] = part.CanCollide
-                Original.Size[part] = part.Size
-                Original.Transparency[part] = part.Transparency
+local function AddConnection(connection)
+    table.insert(Connections, connection)
+    return connection
+end
+
+local function Notify(title, content, duration)
+    if not State.Notifications then return end
+    Rayfield:Notify({
+        Title = title,
+        Content = content,
+        Duration = duration or 3
+    })
+end
+
+local function Cleanup()
+    -- Stop threads first
+    State.AutoClicker = false
+    State.ChatSpam = false
+    task.wait(0.1)
+
+    -- Disconnect all connections
+    for _, connection in ipairs(Connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    table.clear(Connections)
+
+    -- Remove ESP drawings
+    if ESPDrawings then
+        for _, drawings in pairs(ESPDrawings) do
+            for _, drawing in pairs(drawings) do
+                pcall(function() drawing:Remove() end)
             end
         end
+        ESPDrawings = {}
     end
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then
-        if not Original.WalkSpeed[hum] then Original.WalkSpeed[hum] = hum.WalkSpeed end
-        if not Original.JumpPower[hum] then Original.JumpPower[hum] = hum.JumpPower end
+
+    -- Restore namecall
+    if NamecallHook and oldNamecall then
+        pcall(function()
+            hookmetamethod(game, "__namecall", oldNamecall)
+        end)
+        NamecallHook = nil
+        oldNamecall = nil
+    end
+
+    -- Restore lighting
+    Lighting.Brightness = originalLighting.Brightness
+    Lighting.ClockTime = originalLighting.ClockTime
+    Lighting.GlobalShadows = originalLighting.GlobalShadows
+    Lighting.FogEnd = originalLighting.FogEnd
+
+    -- Restore color corrections
+    for effect, enabled in pairs(originalColorCorrectionStates) do
+        if effect and effect.Parent then
+            effect.Enabled = enabled
+        end
+    end
+    originalColorCorrectionStates = {}
+
+    -- Restore wallhack transparency
+    DisableWallhack()
+    -- Restore hitbox sizes
+    RemoveHitboxExpander()
+
+    -- Remove teleport tool
+    if TeleportToolInstance then
+        TeleportToolInstance:Destroy()
+        TeleportToolInstance = nil
+    end
+
+    -- Remove FOV circle
+    if FOVCircle then
+        FOVCircle:Remove()
+        FOVCircle = nil
+    end
+
+    -- Clear player list buttons
+    for _, btn in pairs(PlayerListButtons) do
+        pcall(function() btn:Destroy() end)
+    end
+    PlayerListButtons = {}
+end
+
+-- ================================================================= --
+-- SYSTEM FUNCTIONS
+-- ================================================================= --
+
+-- ---------- ESP System ----------
+local function CreateESPForPlayer(player)
+    if player == LocalPlayer then return end
+    local drawings = {}
+
+    local box = Drawing.new("Square")
+    box.Thickness = 1
+    box.Color = State.ESPColor
+    box.Filled = false
+    box.Visible = false
+    box.ZIndex = 10
+    drawings.Box = box
+
+    local tracer = Drawing.new("Line")
+    tracer.Thickness = 1
+    tracer.Color = State.ESPColor
+    tracer.Visible = false
+    tracer.ZIndex = 10
+    drawings.Tracer = tracer
+
+    local name = Drawing.new("Text")
+    name.Size = 13
+    name.Color = State.ESPColor
+    name.Center = true
+    name.Outline = true
+    name.Visible = false
+    name.ZIndex = 10
+    drawings.Name = name
+
+    local distance = Drawing.new("Text")
+    distance.Size = 13
+    distance.Color = State.ESPColor
+    distance.Center = true
+    distance.Outline = true
+    distance.Visible = false
+    distance.ZIndex = 10
+    drawings.Distance = distance
+
+    local health = Drawing.new("Line")
+    health.Thickness = 2
+    health.Color = Color3.fromRGB(0, 255, 0)
+    health.Visible = false
+    health.ZIndex = 10
+    drawings.Health = health
+
+    ESPDrawings[player] = drawings
+    return drawings
+end
+
+local function RemoveESPForPlayer(player)
+    local drawings = ESPDrawings[player]
+    if drawings then
+        for _, drawing in pairs(drawings) do
+            pcall(function() drawing:Remove() end)
+        end
+        ESPDrawings[player] = nil
     end
 end
 
-local function RestoreCharacter(char)
-    if not char then return end
-    for part, val in pairs(Original.CanCollide) do
-        if part and part.Parent then
-            pcall(function() part.CanCollide = val end)
-        end
-    end
-    for part, val in pairs(Original.Size) do
-        if part and part.Parent then
-            pcall(function() part.Size = val end)
-        end
-    end
-    for part, val in pairs(Original.Transparency) do
-        if part and part.Parent then
-            pcall(function() part.Transparency = val end)
-        end
-    end
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then
-        if Original.WalkSpeed[hum] then pcall(function() hum.WalkSpeed = Original.WalkSpeed[hum] end) end
-        if Original.JumpPower[hum] then pcall(function() hum.JumpPower = Original.JumpPower[hum] end) end
+local function RefreshESP()
+    for player, drawings in pairs(ESPDrawings) do
+        if drawings.Box then drawings.Box.Visible = State.ESPBox end
+        if drawings.Tracer then drawings.Tracer.Visible = State.ESPTracer end
+        if drawings.Name then drawings.Name.Visible = State.ESPName end
+        if drawings.Distance then drawings.Distance.Visible = State.ESPDistance end
+        if drawings.Health then drawings.Health.Visible = State.ESPHealth end
     end
 end
 
--- ========== UTILITY FUNCTIONS ==========
-local function getPlayerRole(player)
-    if not player or not player.Character then return "Innocent" end
-    local char = player.Character
-    local bp = player:FindFirstChild("Backpack")
-    if char:FindFirstChild("Knife") or (bp and bp:FindFirstChild("Knife")) then
-        return "Murderer"
-    elseif char:FindFirstChild("Gun") or (bp and bp:FindFirstChild("Gun")) or
-           char:FindFirstChild("Revolver") or (bp and bp:FindFirstChild("Revolver")) then
-        return "Sheriff"
-    end
-    return "Innocent"
-end
-
-local function getGunDrop()
-    for _, obj in pairs(Workspace:GetChildren()) do
-        if obj.Name == "GunDrop" then return obj end
-        if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
-            if obj:FindFirstChild("Gun") or obj:FindFirstChild("Revolver") then
-                return obj
-            end
+local function StartESP()
+    if ESPConnection then return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            CreateESPForPlayer(player)
         end
     end
-    return nil
-end
 
-local function getCoins()
-    local coins = {}
-    for _, child in pairs(Workspace:GetDescendants()) do
-        if child:IsA("BasePart") and child.Name:find("Coin") then
-            table.insert(coins, child)
+    AddConnection(Players.PlayerAdded:Connect(function(player)
+        if player ~= LocalPlayer then
+            CreateESPForPlayer(player)
         end
-    end
-    return coins
-end
+    end))
 
-local function getSpawn()
-    return Workspace:FindFirstChild("SpawnLocation") or Workspace:FindFirstChildWhichIsA("SpawnLocation")
-end
+    AddConnection(Players.PlayerRemoving:Connect(function(player)
+        RemoveESPForPlayer(player)
+        PlayerListButtons[player] = nil
+    end))
 
--- ========== RAYFIELD WINDOW ==========
-local Window = Rayfield:CreateWindow({
-    Name = "WIA HUB v11.0.2",
-    LoadingTitle = "WIA HUB",
-    LoadingSubtitle = "by whitewia / tordark",
-    Theme = "Purple",
-    ConfigurationSaving = { Enabled = false },
-    KeySystem = false,
-})
+    ESPConnection = RunService.RenderStepped:Connect(function()
+        local camera = workspace.CurrentCamera
+        if not camera then return end
 
-local CombatTab = Window:CreateTab("Combat", 4483362458)
-local VisualsTab = Window:CreateTab("Visuals", 4483345998)
-local MovementTab = Window:CreateTab("Movement", 4483362458)
-local MM2Tab = Window:CreateTab("MM2 Pro", 4483362458)
-local ServerTab = Window:CreateTab("Server", 4483362458)
+        for player, drawings in pairs(ESPDrawings) do
+            local character = player.Character
+            if character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
+                local humanoid = character.Humanoid
+                local rootPart = character.HumanoidRootPart
+                if humanoid.Health > 0 then
+                    local screenPos, onScreen = camera:WorldToScreenPoint(rootPart.Position)
+                    if onScreen then
+                        local scale = 1000 / (camera.CFrame.Position - rootPart.Position).Magnitude
+                        local size = Vector2.new(2 * scale, 3 * scale)
+                        local boxPos = Vector2.new(screenPos.X - size.X/2, screenPos.Y - size.Y/2)
 
--- ========== COMBAT TAB ==========
-CombatTab:CreateSection("Aimbot")
-CombatTab:CreateToggle({
-    Name = "Aimbot",
-    CurrentValue = false,
-    Callback = function(v) Settings.Aimbot = v end
-})
-CombatTab:CreateSlider({
-    Name = "Aimbot FOV",
-    Range = {10, 400},
-    Increment = 1,
-    Suffix = "px",
-    CurrentValue = 90,
-    Callback = function(v) Settings.AimbotFOV = v end
-})
-CombatTab:CreateSlider({
-    Name = "Smoothness",
-    Range = {1, 20},
-    Increment = 1,
-    CurrentValue = 5,
-    Callback = function(v) Settings.Smoothness = v end
-})
-CombatTab:CreateToggle({
-    Name = "Triggerbot",
-    CurrentValue = false,
-    Callback = function(v) Settings.Triggerbot = v end
-})
+                        if drawings.Box.Visible then
+                            drawings.Box.Size = size
+                            drawings.Box.Position = boxPos
+                            drawings.Box.Color = State.RainbowMode and Color3.fromHSV(tick() % 5 / 5, 1, 1) or State.ESPColor
+                        end
 
-CombatTab:CreateSection("Hitbox Expander")
-CombatTab:CreateToggle({
-    Name = "Hitbox Expander",
-    CurrentValue = false,
-    Callback = function(v) Settings.HitboxExpander = v end
-})
-CombatTab:CreateSlider({
-    Name = "Hitbox Size",
-    Range = {2, 20},
-    Increment = 1,
-    Suffix = " studs",
-    CurrentValue = 5,
-    Callback = function(v) Settings.HitboxSize = v end
-})
+                        if drawings.Tracer.Visible then
+                            drawings.Tracer.From = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
+                            drawings.Tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+                            drawings.Tracer.Color = State.RainbowMode and Color3.fromHSV(tick() % 5 / 5, 1, 1) or State.ESPColor
+                        end
 
-CombatTab:CreateSection("Auto")
-CombatTab:CreateToggle({
-    Name = "AutoClicker",
-    CurrentValue = false,
-    Callback = function(v) Settings.AutoClicker = v end
-})
-CombatTab:CreateSlider({
-    Name = "Click Delay (ms)",
-    Range = {10, 1000},
-    Increment = 10,
-    Suffix = " ms",
-    CurrentValue = 100,
-    Callback = function(v) Settings.ClickDelay = v end
-})
+                        if drawings.Name.Visible then
+                            drawings.Name.Text = player.Name
+                            drawings.Name.Position = Vector2.new(screenPos.X, screenPos.Y - size.Y/2 - 15)
+                            drawings.Name.Color = State.RainbowMode and Color3.fromHSV(tick() % 5 / 5, 1, 1) or State.ESPColor
+                        end
 
--- ========== VISUALS TAB ==========
-VisualsTab:CreateSection("ESP")
-VisualsTab:CreateToggle({
-    Name = "ESP Boxes",
-    CurrentValue = true,
-    Callback = function(v) Settings.ESPBox = v end
-})
-VisualsTab:CreateToggle({
-    Name = "ESP Tracers",
-    CurrentValue = true,
-    Callback = function(v) Settings.ESPTracer = v end
-})
-VisualsTab:CreateToggle({
-    Name = "ESP Names",
-    CurrentValue = true,
-    Callback = function(v) Settings.ESPName = v end
-})
-VisualsTab:CreateToggle({
-    Name = "ESP Distance",
-    CurrentValue = true,
-    Callback = function(v) Settings.ESPDistance = v end
-})
-VisualsTab:CreateToggle({
-    Name = "ESP Health",
-    CurrentValue = true,
-    Callback = function(v) Settings.ESPHealth = v end
-})
-VisualsTab:CreateToggle({
-    Name = "Coin ESP",
-    CurrentValue = true,
-    Callback = function(v) Settings.CoinESP = v end
-})
-VisualsTab:CreateToggle({
-    Name = "Gun Drop ESP",
-    CurrentValue = true,
-    Callback = function(v) Settings.GunESP = v end
-})
-VisualsTab:CreateToggle({
-    Name = "Wallhack",
-    CurrentValue = false,
-    Callback = function(v) Settings.Wallhack = v end
-})
+                        if drawings.Distance.Visible then
+                            local dist = (camera.CFrame.Position - rootPart.Position).Magnitude
+                            drawings.Distance.Text = string.format("%.0f studs", dist)
+                            drawings.Distance.Position = Vector2.new(screenPos.X, screenPos.Y + size.Y/2 + 5)
+                            drawings.Distance.Color = State.RainbowMode and Color3.fromHSV(tick() % 5 / 5, 1, 1) or State.ESPColor
+                        end
 
-VisualsTab:CreateSection("World")
-VisualsTab:CreateToggle({
-    Name = "FullBright",
-    CurrentValue = false,
-    Callback = function(v) Settings.FullBright = v end
-})
-VisualsTab:CreateToggle({
-    Name = "No Fog",
-    CurrentValue = false,
-    Callback = function(v) Settings.NoFog = v end
-})
-VisualsTab:CreateSlider({
-    Name = "Camera FOV",
-    Range = {50, 120},
-    Increment = 1,
-    Suffix = "°",
-    CurrentValue = 70,
-    Callback = function(v) Settings.CamFOV = v end
-})
-VisualsTab:CreateToggle({
-    Name = "Remove Yellow Tint",
-    CurrentValue = true,
-    Callback = function(v) Settings.DisableYellowTint = v end
-})
-
--- ========== MOVEMENT TAB ==========
-MovementTab:CreateSection("Flight & Noclip")
-MovementTab:CreateToggle({
-    Name = "Flight",
-    CurrentValue = false,
-    Callback = function(v) Settings.Flight = v end
-})
-MovementTab:CreateSlider({
-    Name = "Fly Speed",
-    Range = {10, 300},
-    Increment = 5,
-    Suffix = " speed",
-    CurrentValue = 50,
-    Callback = function(v) Settings.FlySpeed = v end
-})
-MovementTab:CreateToggle({
-    Name = "Noclip",
-    CurrentValue = false,
-    Callback = function(v) Settings.Noclip = v end
-})
-
-MovementTab:CreateSection("Speed & Jump")
-MovementTab:CreateSlider({
-    Name = "Walk Speed",
-    Range = {16, 200},
-    Increment = 1,
-    CurrentValue = 16,
-    Callback = function(v)
-        Settings.Speed = v
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.WalkSpeed = v
-        end
-    end
-})
-MovementTab:CreateSlider({
-    Name = "Jump Power",
-    Range = {50, 200},
-    Increment = 1,
-    CurrentValue = 50,
-    Callback = function(v)
-        Settings.JumpPower = v
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-            LocalPlayer.Character.Humanoid.JumpPower = v
-        end
-    end
-})
-MovementTab:CreateToggle({
-    Name = "Infinite Jump",
-    CurrentValue = false,
-    Callback = function(v) Settings.InfiniteJump = v end
-})
-MovementTab:CreateToggle({
-    Name = "Bhop",
-    CurrentValue = false,
-    Callback = function(v) Settings.Bhop = v end
-})
-MovementTab:CreateToggle({
-    Name = "Spinbot",
-    CurrentValue = false,
-    Callback = function(v) Settings.Spinbot = v end
-})
-MovementTab:CreateSlider({
-    Name = "Spin Speed",
-    Range = {5, 50},
-    Increment = 1,
-    CurrentValue = 20,
-    Callback = function(v) Settings.SpinSpeed = v end
-})
-MovementTab:CreateToggle({
-    Name = "CFrame Speed (Bypass)",
-    CurrentValue = false,
-    Callback = function(v) Settings.CFrameSpeed = v end
-})
-MovementTab:CreateSlider({
-    Name = "CFrame Multiplier",
-    Range = {1, 10},
-    Increment = 1,
-    CurrentValue = 2,
-    Callback = function(v) Settings.CFrameMultiplier = v end
-})
-
--- ========== MM2 TAB ==========
-MM2Tab:CreateSection("Auto Farm")
-MM2Tab:CreateToggle({
-    Name = "Auto-Farm Coins",
-    CurrentValue = false,
-    Callback = function(v) Settings.AutoFarm = v end
-})
-MM2Tab:CreateSlider({
-    Name = "Farm Speed",
-    Range = {10, 50},
-    Increment = 5,
-    CurrentValue = 25,
-    Callback = function(v) Settings.FarmSpeed = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Auto-Grab Gun",
-    CurrentValue = false,
-    Callback = function(v) Settings.AutoGrabGun = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Smart Gun Teleport",
-    CurrentValue = false,
-    Callback = function(v) Settings.GunTeleport = v end
-})
-
-MM2Tab:CreateSection("Combat")
-MM2Tab:CreateToggle({
-    Name = "Silent Aim (Aim Lock)",
-    CurrentValue = false,
-    Callback = function(v) Settings.SilentAim = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Auto-Shoot (Sheriff)",
-    CurrentValue = false,
-    Callback = function(v) Settings.AutoShoot = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Kill Aura",
-    CurrentValue = false,
-    Callback = function(v) Settings.KillAura = v end
-})
-MM2Tab:CreateSlider({
-    Name = "Kill Radius",
-    Range = {1, 30},
-    Increment = 1,
-    CurrentValue = 12,
-    Callback = function(v) Settings.KillRadius = v end
-})
-
-MM2Tab:CreateSection("Protection")
-MM2Tab:CreateToggle({
-    Name = "Anti-Knife (Run from Murderer)",
-    CurrentValue = false,
-    Callback = function(v) Settings.AntiKnife = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Anti-Void",
-    CurrentValue = false,
-    Callback = function(v) Settings.AntiVoid = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Anti-Fall Damage",
-    CurrentValue = false,
-    Callback = function(v) Settings.AntiFall = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Anti-AFK",
-    CurrentValue = false,
-    Callback = function(v) Settings.AntiAFK = v end
-})
-MM2Tab:CreateToggle({
-    Name = "Godmode (Health Lock)",
-    CurrentValue = false,
-    Callback = function(v) Settings.Godmode = v end
-})
-
-MM2Tab:CreateSection("Chat & Spam")
-MM2Tab:CreateToggle({
-    Name = "Chat Spam",
-    CurrentValue = false,
-    Callback = function(v) Settings.ChatSpam = v end
-})
-MM2Tab:CreateSlider({
-    Name = "Spam Delay (s)",
-    Range = {1, 60},
-    Increment = 1,
-    CurrentValue = 5,
-    Callback = function(v) Settings.SpamDelay = v end
-})
-
--- ========== SERVER TAB ==========
-ServerTab:CreateButton({
-    Name = "Rejoin Server",
-    Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end
-})
-ServerTab:CreateButton({
-    Name = "Server Hop",
-    Callback = function()
-        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
-        for _, s in pairs(servers) do
-            if s.playing < s.maxPlayers and s.id ~= game.JobId then
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
-                break
-            end
-        end
-    end
-})
-
--- ========== BACKGROUND LOOPS (FIXED) ==========
-
--- 1. Flight
-local bv, bg = nil, nil
-RunService.Heartbeat:Connect(function()
-    if Settings.Flight and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local root = LocalPlayer.Character.HumanoidRootPart
-        if not bv then
-            bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-            bv.Parent = root
-        end
-        if not bg then
-            bg = Instance.new("BodyGyro")
-            bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-            bg.Parent = root
-        end
-        local moveDir = Vector3.new(0,0,0)
-        local cam = Camera
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
-        if moveDir.Magnitude > 0 then
-            bv.Velocity = moveDir.Unit * Settings.FlySpeed
-            bg.CFrame = CFrame.new(root.Position, root.Position + moveDir)
-        else
-            bv.Velocity = Vector3.new(0,0,0)
-        end
-    else
-        if bv then bv:Destroy() bv = nil end
-        if bg then bg:Destroy() bg = nil end
-    end
-end)
-
--- 2. Noclip
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if Settings.Noclip then
-                if not Original.CanCollide[part] then Original.CanCollide[part] = part.CanCollide end
-                part.CanCollide = false
-            else
-                if Original.CanCollide[part] then
-                    part.CanCollide = Original.CanCollide[part]
-                    Original.CanCollide[part] = nil
-                end
-            end
-        end
-    end
-end)
-
--- 3. Walk Speed / Jump Power
-RunService.Heartbeat:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then
-        if hum.WalkSpeed ~= Settings.Speed then hum.WalkSpeed = Settings.Speed end
-        if hum.JumpPower ~= Settings.JumpPower then hum.JumpPower = Settings.JumpPower end
-    end
-end)
-
--- 4. Infinite Jump
-UserInputService.JumpRequest:Connect(function()
-    if Settings.InfiniteJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-end)
-
--- 5. Bhop
-RunService.Heartbeat:Connect(function()
-    if Settings.Bhop and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        local hum = LocalPlayer.Character.Humanoid
-        if hum.MoveDirection.Magnitude > 0 and hum.FloorMaterial ~= Enum.Material.Air then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end
-end)
-
--- 6. Spinbot
-RunService.RenderStepped:Connect(function()
-    if Settings.Spinbot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(Settings.SpinSpeed), 0)
-    end
-end)
-
--- 7. CFrame Speed
-RunService.Heartbeat:Connect(function()
-    if Settings.CFrameSpeed and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local root = LocalPlayer.Character.HumanoidRootPart
-        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-        if hum and hum.MoveDirection.Magnitude > 0 then
-            root.CFrame = root.CFrame + (hum.MoveDirection * (Settings.CFrameMultiplier / 10))
-        end
-    end
-end)
-
--- 8. Godmode
-RunService.Heartbeat:Connect(function()
-    if Settings.Godmode and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.Health = LocalPlayer.Character.Humanoid.MaxHealth
-    end
-end)
-
--- 9. Anti-Void
-RunService.Heartbeat:Connect(function()
-    if Settings.AntiVoid and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        if LocalPlayer.Character.HumanoidRootPart.Position.Y < -50 then
-            local spawn = getSpawn()
-            if spawn then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = spawn.CFrame + Vector3.new(0, 3, 0)
-            end
-        end
-    end
-end)
-
--- 10. Anti-Fall
-RunService.Heartbeat:Connect(function()
-    if Settings.AntiFall and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        local hum = LocalPlayer.Character.Humanoid
-        if hum:GetState() == Enum.HumanoidStateType.FallingDown then
-            hum:ChangeState(Enum.HumanoidStateType.Landed)
-        end
-    end
-end)
-
--- 11. Anti-AFK
-local afkConnection
-LocalPlayer.Idled:Connect(function()
-    if Settings.AntiAFK then
-        VirtualUser:Button2Down(Vector2.new(0,0), Camera.CFrame)
-        task.wait(1)
-        VirtualUser:Button2Up(Vector2.new(0,0), Camera.CFrame)
-    end
-end)
-
--- 12. Aimbot
-RunService.RenderStepped:Connect(function()
-    if Settings.Aimbot then
-        local closest = nil
-        local minDist = Settings.AimbotFOV
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
-                local head = plr.Character.Head
-                local pos, onScreen = Camera:WorldToScreenPoint(head.Position)
-                if onScreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        closest = plr
+                        if drawings.Health.Visible then
+                            local healthPercent = humanoid.Health / humanoid.MaxHealth
+                            local healthWidth = size.X
+                            drawings.Health.From = Vector2.new(boxPos.X, boxPos.Y - 5)
+                            drawings.Health.To = Vector2.new(boxPos.X + healthWidth * healthPercent, boxPos.Y - 5)
+                            drawings.Health.Color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0)
+                        end
+                    else
+                        for _, drawing in pairs(drawings) do drawing.Visible = false end
                     end
+                else
+                    for _, drawing in pairs(drawings) do drawing.Visible = false end
                 end
-            end
-        end
-        if closest and closest.Character and closest.Character:FindFirstChild("Head") then
-            local head = closest.Character.Head
-            local targetPos = head.Position
-            local current = Camera.CFrame
-            local new = CFrame.new(current.Position, targetPos)
-            if Settings.Smoothness > 1 then
-                Camera.CFrame = current:Lerp(new, 1 / Settings.Smoothness)
             else
-                Camera.CFrame = new
+                for _, drawing in pairs(drawings) do drawing.Visible = false end
             end
         end
-    end
-end)
+    end)
+    Connections[#Connections + 1] = ESPConnection
+end
 
--- 13. Triggerbot
-RunService.RenderStepped:Connect(function()
-    if Settings.Triggerbot then
-        local target = Mouse.Target
-        if target and target.Parent then
-            local plr = Players:GetPlayerFromCharacter(target.Parent)
-            if plr and plr ~= LocalPlayer then
-                mouse1click()
-            end
-        end
+-- ---------- Aimbot ----------
+local function GetNearestTarget()
+    if State.AimbotTarget and State.AimbotTarget.Character and State.AimbotTarget.Character:FindFirstChild("Head") then
+        return State.AimbotTarget
     end
-end)
 
--- 14. Hitbox Expander
-RunService.Heartbeat:Connect(function()
-    if Settings.HitboxExpander then
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local root = plr.Character.HumanoidRootPart
-                if not Original.Size[root] then
-                    Original.Size[root] = root.Size
-                    Original.Transparency[root] = root.Transparency
-                end
-                root.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
-                root.Transparency = 0.7
-            end
-        end
-    else
-        for part, val in pairs(Original.Size) do
-            if part and part.Parent then
-                pcall(function() part.Size = val end)
-            end
-        end
-        for part, val in pairs(Original.Transparency) do
-            if part and part.Parent then
-                pcall(function() part.Transparency = val end)
-            end
-        end
-        Original.Size = {}
-        Original.Transparency = {}
-    end
-end)
+    local nearest = nil
+    local nearestDist = State.AimbotFOV
+    local camera = workspace.CurrentCamera
+    if not camera then return nil end
 
--- 15. AutoClicker
-task.spawn(function()
-    while true do
-        task.wait(Settings.ClickDelay / 1000)
-        if Settings.AutoClicker then
-            mouse1click()
-        end
-    end
-end)
-
--- 16. Chat Spam
-task.spawn(function()
-    while true do
-        task.wait(Settings.SpamDelay)
-        if Settings.ChatSpam then
-            local chat = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
-            if chat and chat:FindFirstChild("SayMessageRequest") then
-                chat.SayMessageRequest:FireServer("WIA HUB ON TOP", "All")
-            end
-        end
-    end
-end)
-
--- 17. MM2: Auto Farm Coins
-local farmCooldown = 0
-RunService.Heartbeat:Connect(function()
-    if Settings.AutoFarm and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local coins = getCoins()
-        if #coins > 0 and tick() - farmCooldown > 0.15 then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            local nearest = nil
-            local minDist = math.huge
-            for _, coin in pairs(coins) do
-                local dist = (hrp.Position - coin.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    nearest = coin
-                end
-            end
-            if nearest then
-                hrp.CFrame = nearest.CFrame * CFrame.new(0, 1, 0)
-                farmCooldown = tick()
-            end
-        end
-    end
-end)
-
--- 18. MM2: Auto-Grab Gun
-RunService.Heartbeat:Connect(function()
-    if Settings.AutoGrabGun then
-        local gun = getGunDrop()
-        local char = LocalPlayer.Character
-        if gun and char and char:FindFirstChild("HumanoidRootPart") then
-            local hrp = char.HumanoidRootPart
-            local gunPart = gun:IsA("Model") and (gun.PrimaryPart or gun:FindFirstChildWhichIsA("BasePart")) or gun
-            if gunPart then
-                hrp.CFrame = gunPart.CFrame * CFrame.new(0, 1, 0)
-                if firetouchinterest then
-                    pcall(function()
-                        firetouchinterest(hrp, gunPart, 0)
-                        firetouchinterest(hrp, gunPart, 1)
-                    end)
-                end
-            end
-        end
-    end
-end)
-
--- 19. MM2: Smart Gun Teleport
-local gunTeleportCooldown = false
-RunService.Heartbeat:Connect(function()
-    if Settings.GunTeleport and not gunTeleportCooldown then
-        local gun = getGunDrop()
-        local char = LocalPlayer.Character
-        if gun and char and char:FindFirstChild("HumanoidRootPart") then
-            local hrp = char.HumanoidRootPart
-            local currentPos = hrp.CFrame
-            local gunPart = gun:IsA("Model") and (gun.PrimaryPart or gun:FindFirstChildWhichIsA("BasePart")) or gun
-            if gunPart then
-                gunTeleportCooldown = true
-                hrp.CFrame = gunPart.CFrame * CFrame.new(0, 1, 0)
-                if firetouchinterest then
-                    pcall(function()
-                        firetouchinterest(hrp, gunPart, 0)
-                        firetouchinterest(hrp, gunPart, 1)
-                    end)
-                end
-                hrp.CFrame = currentPos
-                task.wait(1.5)
-                gunTeleportCooldown = false
-            end
-        end
-    end
-end)
-
--- 20. MM2: Silent Aim (Aim Lock on Murderer)
-RunService.RenderStepped:Connect(function()
-    if Settings.SilentAim then
-        local murderer = nil
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and getPlayerRole(plr) == "Murderer" and plr.Character and plr.Character:FindFirstChild("Head") then
-                murderer = plr.Character
-                break
-            end
-        end
-        if murderer then
-            local gun = LocalPlayer.Character:FindFirstChild("Gun") or LocalPlayer.Character:FindFirstChild("Revolver")
-            if gun then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, murderer.Head.Position)
-            end
-        end
-    end
-end)
-
--- 21. MM2: Auto-Shoot
-RunService.RenderStepped:Connect(function()
-    if Settings.AutoShoot then
-        local murderer = nil
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and getPlayerRole(plr) == "Murderer" and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                murderer = plr.Character
-                break
-            end
-        end
-        if murderer then
-            local gun = LocalPlayer.Character:FindFirstChild("Gun") or LocalPlayer.Character:FindFirstChild("Revolver")
-            if gun and mouse1click then
-                mouse1click()
-            end
-        end
-    end
-end)
-
--- 22. MM2: Kill Aura
-RunService.RenderStepped:Connect(function()
-    if Settings.KillAura then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("Knife") then
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (char.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-                    if dist < Settings.KillRadius then
-                        if mouse1click then mouse1click() end
-                        if char.Knife:FindFirstChild("Stab") then
-                            char.Knife.Stab:FireServer()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            if character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
+                local humanoid = character.Humanoid
+                if humanoid.Health > 0 then
+                    local targetPos = character.Head.Position
+                    local screenPos, onScreen = camera:WorldToScreenPoint(targetPos)
+                    if onScreen then
+                        local screenCenter = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                        if dist < nearestDist then
+                            nearest = player
+                            nearestDist = dist
                         end
                     end
                 end
             end
         end
     end
-end)
+    return nearest
+end
 
--- 23. MM2: Anti-Knife
-RunService.Heartbeat:Connect(function()
-    if Settings.AntiKnife then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and getPlayerRole(plr) == "Murderer" and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                    local dist = (char.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-                    if dist < 12 then
-                        local dir = (char.HumanoidRootPart.Position - plr.Character.HumanoidRootPart.Position).Unit
-                        char.HumanoidRootPart.CFrame = CFrame.new(char.HumanoidRootPart.Position + dir * 15)
+local function StartAimbot()
+    StopAimbot()
+    AimbotConnection = RunService.RenderStepped:Connect(function()
+        if not State.Aimbot then return end
+        -- FOV Circle
+        if State.AimbotFOVCircle then
+            if not FOVCircle then
+                FOVCircle = Drawing.new("Circle")
+                FOVCircle.Thickness = 1.5
+                FOVCircle.NumSides = 60
+                FOVCircle.Filled = false
+                FOVCircle.Color = Color3.fromRGB(180, 0, 255)
+                FOVCircle.Visible = false
+            end
+            FOVCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
+            FOVCircle.Radius = State.AimbotFOV
+            FOVCircle.Visible = true
+        elseif FOVCircle then
+            FOVCircle.Visible = false
+        end
+
+        local target = GetNearestTarget()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local camera = workspace.CurrentCamera
+            if not camera then return end
+            local targetPos = target.Character.Head.Position
+            local lookAt = CFrame.new(camera.CFrame.Position, targetPos)
+            local smooth = State.AimbotSmoothness / 10
+            camera.CFrame = camera.CFrame:Lerp(lookAt, smooth)
+        end
+    end)
+    Connections[#Connections + 1] = AimbotConnection
+end
+
+local function StopAimbot()
+    if AimbotConnection then
+        pcall(function() AimbotConnection:Disconnect() end)
+        AimbotConnection = nil
+    end
+    if FOVCircle then
+        FOVCircle:Remove()
+        FOVCircle = nil
+    end
+end
+
+-- ---------- Triggerbot ----------
+local function StartTriggerbot()
+    StopTriggerbot()
+    TriggerbotConnection = Mouse.Button1Down:Connect(function()
+        if State.Triggerbot then
+            local target = GetNearestTarget()
+            if target and target.Character and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 then
+                local shootRemote = ReplicatedStorage:FindFirstChild("ShootGun") or ReplicatedStorage:FindFirstChild("Fire") or ReplicatedStorage:FindFirstChild("Shoot")
+                if shootRemote and shootRemote:IsA("RemoteEvent") then
+                    shootRemote:FireServer(target.Character.Head.Position)
+                end
+            end
+        end
+    end)
+    Connections[#Connections + 1] = TriggerbotConnection
+end
+
+local function StopTriggerbot()
+    if TriggerbotConnection then
+        pcall(function() TriggerbotConnection:Disconnect() end)
+        TriggerbotConnection = nil
+    end
+end
+
+-- ---------- Hitbox Expander ----------
+local function ApplyHitboxExpander()
+    RemoveHitboxExpander()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            if character then
+                for _, part in ipairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        if not originalHitboxSizes[player] then originalHitboxSizes[player] = {} end
+                        originalHitboxSizes[player][part] = part.Size
+                        part.Size = part.Size * State.HitboxSize
                     end
                 end
             end
         end
     end
-end)
-
--- 24. Wallhack
-RunService.Heartbeat:Connect(function()
-    if Settings.Wallhack then
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Character and not plr.Character:FindFirstChild("WIA_WH") then
-                local hl = Instance.new("Highlight")
-                hl.Name = "WIA_WH"
-                hl.FillColor = Color3.fromRGB(180, 0, 255)
-                hl.FillTransparency = 0.3
-                hl.OutlineColor = Color3.fromRGB(255,255,255)
-                hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                hl.Parent = plr.Character
-            end
-        end
-    else
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr.Character and plr.Character:FindFirstChild("WIA_WH") then
-                plr.Character.WIA_WH:Destroy()
-            end
-        end
-    end
-end)
-
--- 25. FullBright & NoFog
-RunService.Heartbeat:Connect(function()
-    if Settings.FullBright then
-        Lighting.Brightness = 2
-        Lighting.Ambient = Color3.fromRGB(255,255,255)
-    else
-        Lighting.Brightness = 1
-        Lighting.Ambient = Color3.fromRGB(127,127,127)
-    end
-    if Settings.NoFog then
-        Lighting.FogEnd = 1e6
-    else
-        Lighting.FogEnd = 10000
-    end
-end)
-
--- 26. Remove Yellow Tint
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if Settings.DisableYellowTint then
-            for _, v in pairs(Lighting:GetDescendants()) do
-                if v:IsA("ColorCorrectionEffect") and v.TintColor.R > 0.8 and v.TintColor.G > 0.7 then
-                    v.TintColor = Color3.new(1,1,1)
-                end
-            end
-        end
-    end
-end)
-
--- 27. Camera FOV
-RunService.RenderStepped:Connect(function()
-    local current = Camera.FieldOfView
-    local target = Settings.CamFOV
-    if math.abs(current - target) > 0.5 then
-        Camera.FieldOfView = current + (target - current) * 0.1
-    end
-end)
-
--- ========== ESP DRAWING (SIMPLE) ==========
-local espLines = {}
-local espTexts = {}
-
-RunService.RenderStepped:Connect(function()
-    for _, d in pairs(espLines) do d:Remove() end
-    for _, d in pairs(espTexts) do d:Remove() end
-    espLines = {}
-    espTexts = {}
-
-    if not (Settings.ESPBox or Settings.ESPTracer or Settings.ESPName or Settings.ESPDistance or Settings.ESPHealth) then return end
-
-    local cam = Camera
-    local viewport = cam.ViewportSize
-    local camPos = cam.CFrame.Position
-
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
-            local head = plr.Character.Head
-            local hum = plr.Character:FindFirstChild("Humanoid")
-            if not hum or hum.Health <= 0 then continue end
-
-            local pos, onScreen = cam:WorldToScreenPoint(head.Position)
-            if not onScreen then continue end
-
-            local dist = (head.Position - camPos).Magnitude
-            local size = math.clamp(100 / dist * 10, 15, 45)
-
-            local x, y = pos.X - size/2, pos.Y - size/2
-            local color = Color3.fromRGB(180, 0, 255)
-
-            if Settings.ESPBox then
-                for i = 1, 4 do
-                    local line = Drawing.new("Line")
-                    if i == 1 then line.From = Vector2.new(x, y) line.To = Vector2.new(x + size, y)
-                    elseif i == 2 then line.From = Vector2.new(x + size, y) line.To = Vector2.new(x + size, y + size)
-                    elseif i == 3 then line.From = Vector2.new(x + size, y + size) line.To = Vector2.new(x, y + size)
-                    else line.From = Vector2.new(x, y + size) line.To = Vector2.new(x, y) end
-                    line.Color = color
-                    line.Thickness = 2
-                    line.Transparency = 1
-                    table.insert(espLines, line)
-                end
-            end
-
-            if Settings.ESPTracer then
-                local tracer = Drawing.new("Line")
-                tracer.From = Vector2.new(viewport.X / 2, viewport.Y)
-                tracer.To = Vector2.new(pos.X, pos.Y)
-                tracer.Color = Color3.fromRGB(180, 0, 255)
-                tracer.Thickness = 1.5
-                tracer.Transparency = 0.7
-                table.insert(espLines, tracer)
-            end
-
-            if Settings.ESPName or Settings.ESPHealth or Settings.ESPDistance then
-                local text = Drawing.new("Text")
-                text.Position = Vector2.new(pos.X, y - 15)
-                text.Size = 13
-                text.Center = true
-                text.Outline = true
-                text.Color = Color3.fromRGB(255,255,255)
-                local str = ""
-                if Settings.ESPName then str = str .. plr.Name .. " " end
-                if Settings.ESPHealth and hum then str = str .. "[" .. math.floor(hum.Health) .. "HP] " end
-                if Settings.ESPDistance then str = str .. "(" .. math.floor(dist) .. "m)" end
-                text.Text = str
-                table.insert(espTexts, text)
-            end
-        end
-    end
-
-    -- Coins ESP
-    if Settings.CoinESP then
-        for _, coin in pairs(getCoins()) do
-            local pos, onScreen = cam:WorldToScreenPoint(coin.Position)
-            if onScreen then
-                local text = Drawing.new("Text")
-                text.Position = Vector2.new(pos.X, pos.Y)
-                text.Text = "$"
-                text.Size = 20
-                text.Center = true
-                text.Outline = true
-                text.Color = Color3.fromRGB(255, 215, 0)
-                table.insert(espTexts, text)
-            end
-        end
-    end
-
-    -- Gun Drop ESP
-    if Settings.GunESP then
-        local gun = getGunDrop()
-        if gun then
-            local gunPart = gun:IsA("Model") and (gun.PrimaryPart or gun:FindFirstChildWhichIsA("BasePart")) or gun
-            if gunPart then
-                local pos, onScreen = cam:WorldToScreenPoint(gunPart.Position)
-                if onScreen then
-                    local text = Drawing.new("Text")
-                    text.Position = Vector2.new(pos.X, pos.Y - 20)
-                    text.Text = "GUN"
-                    text.Size = 14
-                    text.Center = true
-                    text.Outline = true
-                    text.Color = Color3.fromRGB(255, 255, 0)
-                    table.insert(espTexts, text)
-                end
-            end
-        end
-    end
-end)
-
--- ========== PLAYER LIST (FIXED) ==========
-local PlayerListGui = Instance.new("ScreenGui")
-PlayerListGui.Name = "WiaPlayerList"
-PlayerListGui.Parent = game:CoreGui
-PlayerListGui.Enabled = false
-
-local PlayerListFrame = Instance.new("Frame")
-PlayerListFrame.Size = UDim2.new(0, 260, 0, 400)
-PlayerListFrame.Position = UDim2.new(0, 360, 0, 10)
-PlayerListFrame.BackgroundColor3 = Color3.fromRGB(10,10,25)
-PlayerListFrame.BackgroundTransparency = 0.2
-PlayerListFrame.BorderSizePixel = 1
-PlayerListFrame.BorderColor3 = Color3.fromRGB(180,0,255)
-PlayerListFrame.Parent = PlayerListGui
-
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1,0,0,30)
-TitleLabel.Text = "PLAYER LIST"
-TitleLabel.TextColor3 = Color3.fromRGB(180,0,255)
-TitleLabel.TextScaled = true
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Parent = PlayerListFrame
-
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1,-10,1,-40)
-Scroll.Position = UDim2.new(0,5,0,35)
-Scroll.BackgroundTransparency = 1
-Scroll.BorderSizePixel = 0
-Scroll.ScrollBarThickness = 4
-Scroll.Parent = PlayerListFrame
-
-local Container = Instance.new("Frame")
-Container.Size = UDim2.new(1,0,0,0)
-Container.BackgroundTransparency = 1
-Container.Parent = Scroll
-
-local function UpdatePlayerList()
-    for _, child in pairs(Container:GetChildren()) do child:Destroy() end
-    local y = 0
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr == LocalPlayer then continue end
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1,0,0,25)
-        btn.Position = UDim2.new(0,0,0,y)
-        btn.Text = plr.Name .. " [TP]"
-        btn.TextColor3 = Color3.fromRGB(255,255,255)
-        btn.BackgroundColor3 = Color3.fromRGB(40,40,55)
-        btn.BorderSizePixel = 0
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 12
-        btn.Parent = Container
-        btn.MouseButton1Click:Connect(function()
-            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
-            end
-        end)
-        y = y + 27
-    end
-    Container.Size = UDim2.new(1,0,0,y)
-    Scroll.CanvasSize = UDim2.new(0,0,0,y)
 end
 
--- Слушаем изменения игроков
-Players.PlayerAdded:Connect(UpdatePlayerList)
-Players.PlayerRemoving:Connect(UpdatePlayerList)
+local function RemoveHitboxExpander()
+    for player, parts in pairs(originalHitboxSizes) do
+        if player and player.Character then
+            for part, originalSize in pairs(parts) do
+                if part and part.Parent then
+                    part.Size = originalSize
+                end
+            end
+        end
+    end
+    originalHitboxSizes = {}
+end
 
--- Добавляем тумблер для Player List
-VisualsTab:CreateToggle({
-    Name = "Player List GUI",
+-- ---------- Wallhack ----------
+local function EnableWallhack()
+    DisableWallhack()
+    WallhackConnection = RunService.RenderStepped:Connect(function()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local character = player.Character
+                if character then
+                    for _, part in ipairs(character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            if not originalTransparencies[player] then originalTransparencies[player] = {} end
+                            if not originalTransparencies[player][part] then
+                                originalTransparencies[player][part] = part.Transparency
+                            end
+                            part.Transparency = 0.7
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    Connections[#Connections + 1] = WallhackConnection
+end
+
+local function DisableWallhack()
+    if WallhackConnection then
+        pcall(function() WallhackConnection:Disconnect() end)
+        WallhackConnection = nil
+    end
+    for player, parts in pairs(originalTransparencies) do
+        if player and player.Character then
+            for part, transparency in pairs(parts) do
+                if part and part.Parent then
+                    part.Transparency = transparency
+                end
+            end
+        end
+    end
+    originalTransparencies = {}
+end
+
+-- ---------- Movement Functions ----------
+local function StartFly()
+    StopFly()
+    MovementConnection = RunService.Heartbeat:Connect(function()
+        if not State.Fly then return end
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.PlatformStand = true
+                local velocity = Vector3.new()
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then velocity += workspace.CurrentCamera.CFrame.LookVector * 50 end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then velocity -= workspace.CurrentCamera.CFrame.LookVector * 50 end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then velocity -= workspace.CurrentCamera.CFrame.RightVector * 50 end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then velocity += workspace.CurrentCamera.CFrame.RightVector * 50 end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then velocity += Vector3.new(0, 50, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then velocity -= Vector3.new(0, 50, 0) end
+                character.HumanoidRootPart.Velocity = velocity
+            end
+        end
+    end)
+    Connections[#Connections + 1] = MovementConnection
+end
+
+local function StopFly()
+    if MovementConnection then
+        pcall(function() MovementConnection:Disconnect() end)
+        MovementConnection = nil
+    end
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChildOfClass("Humanoid") then
+        character:FindFirstChildOfClass("Humanoid").PlatformStand = false
+    end
+end
+
+local function EnableNoclip()
+    DisableNoclip()
+    NoclipConnection = RunService.Stepped:Connect(function()
+        if not State.Noclip then return end
+        local character = LocalPlayer.Character
+        if character then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+    Connections[#Connections + 1] = NoclipConnection
+end
+
+local function DisableNoclip()
+    if NoclipConnection then
+        pcall(function() NoclipConnection:Disconnect() end)
+        NoclipConnection = nil
+    end
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+local function ApplyMovementSettings()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChildOfClass("Humanoid") then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        humanoid.WalkSpeed = State.Speed
+        humanoid.JumpPower = State.JumpPower
+    end
+end
+
+local function EnableInfiniteJump()
+    DisableInfiniteJump()
+    InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
+        if State.InfiniteJump then
+            local character = LocalPlayer.Character
+            if character and character:FindFirstChildOfClass("Humanoid") then
+                character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end)
+    Connections[#Connections + 1] = InfiniteJumpConnection
+end
+
+local function DisableInfiniteJump()
+    if InfiniteJumpConnection then
+        pcall(function() InfiniteJumpConnection:Disconnect() end)
+        InfiniteJumpConnection = nil
+    end
+end
+
+local function EnableBhop()
+    DisableBhop()
+    BhopConnection = RunService.Heartbeat:Connect(function()
+        if not State.Bhop then return end
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end)
+    Connections[#Connections + 1] = BhopConnection
+end
+
+local function DisableBhop()
+    if BhopConnection then
+        pcall(function() BhopConnection:Disconnect() end)
+        BhopConnection = nil
+    end
+end
+
+local function StartSpinbot()
+    StopSpinbot()
+    SpinbotConnection = RunService.RenderStepped:Connect(function()
+        if not State.Spinbot then return end
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            character.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(5), 0)
+        end
+    end)
+    Connections[#Connections + 1] = SpinbotConnection
+end
+
+local function StopSpinbot()
+    if SpinbotConnection then
+        pcall(function() SpinbotConnection:Disconnect() end)
+        SpinbotConnection = nil
+    end
+end
+
+local function EnableCFrameSpeed()
+    DisableCFrameSpeed()
+    CFrameSpeedConnection = RunService.Heartbeat:Connect(function()
+        if not State.CFrameSpeed then return end
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") then
+            local hum = character.Humanoid
+            local root = character.HumanoidRootPart
+            if hum.MoveDirection.Magnitude > 0 then
+                root.CFrame = root.CFrame + (hum.MoveDirection * (State.CFrameSpeedMultiplier / 10))
+            end
+        end
+    end)
+    Connections[#Connections + 1] = CFrameSpeedConnection
+end
+
+local function DisableCFrameSpeed()
+    if CFrameSpeedConnection then
+        pcall(function() CFrameSpeedConnection:Disconnect() end)
+        CFrameSpeedConnection = nil
+    end
+end
+
+-- ---------- MM2 Functions ----------
+local function TeleportToGun()
+    local character = LocalPlayer.Character
+    if not character then return end
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("Tool") and v.Name:lower():find("gun") then
+            character.HumanoidRootPart.CFrame = v.Handle.CFrame + Vector3.new(0, 2, 0)
+            Notify("MM2", "Teleported to gun.")
+            return
+        end
+    end
+    Notify("MM2", "No gun found.")
+end
+
+local function TeleportToTool()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local nearestTool = nil
+    local nearestDist = math.huge
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("Tool") and v:FindFirstChild("Handle") then
+            local dist = (character.HumanoidRootPart.Position - v.Handle.Position).Magnitude
+            if dist < nearestDist then
+                nearestDist = dist
+                nearestTool = v
+            end
+        end
+    end
+    if nearestTool then
+        character.HumanoidRootPart.CFrame = nearestTool.Handle.CFrame + Vector3.new(0, 2, 0)
+        Notify("MM2", "Teleported to nearest tool: " .. nearestTool.Name)
+    else
+        Notify("MM2", "No tool found.")
+    end
+end
+
+local function EnableSilentAim()
+    DisableSilentAim()
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if method == "FireServer" and tostring(self) == "ShootGun" then
+            local target = GetNearestTarget()
+            if target and target.Character and target.Character:FindFirstChild("Head") then
+                return oldNamecall(self, unpack({...}, 1, select("#", ...) - 1), target.Character.Head.Position)
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+    NamecallHook = true
+end
+
+local function DisableSilentAim()
+    if NamecallHook and oldNamecall then
+        pcall(function()
+            hookmetamethod(game, "__namecall", oldNamecall)
+        end)
+        NamecallHook = nil
+        oldNamecall = nil
+    end
+end
+
+local function StartAutoShoot()
+    StopAutoShoot()
+    MM2Connection = RunService.Heartbeat:Connect(function()
+        if not State.AutoShoot then return end
+        local target = GetNearestTarget()
+        if target and target.Character and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 then
+            local shootRemote = ReplicatedStorage:FindFirstChild("ShootGun") or ReplicatedStorage:FindFirstChild("Fire") or ReplicatedStorage:FindFirstChild("Shoot")
+            if shootRemote and shootRemote:IsA("RemoteEvent") then
+                shootRemote:FireServer(target.Character.Head.Position)
+            end
+        end
+    end)
+    Connections[#Connections + 1] = MM2Connection
+end
+
+local function StopAutoShoot()
+    if MM2Connection then
+        pcall(function() MM2Connection:Disconnect() end)
+        MM2Connection = nil
+    end
+end
+
+local function StartKillAura()
+    StopKillAura()
+    CombatConnection = RunService.Heartbeat:Connect(function()
+        if not State.KillAura then return end
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local character = player.Character
+                if character and character:FindFirstChild("Humanoid") and character:FindFirstChild("HumanoidRootPart") then
+                    local humanoid = character.Humanoid
+                    if humanoid.Health > 0 then
+                        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if myRoot then
+                            local distance = (myRoot.Position - character.HumanoidRootPart.Position).Magnitude
+                            if distance <= State.KillAuraRange then
+                                local shootRemote = ReplicatedStorage:FindFirstChild("ShootGun") or ReplicatedStorage:FindFirstChild("Fire") or ReplicatedStorage:FindFirstChild("Shoot")
+                                if shootRemote and shootRemote:IsA("RemoteEvent") then
+                                    shootRemote:FireServer(character.Head.Position)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    Connections[#Connections + 1] = CombatConnection
+end
+
+local function StopKillAura()
+    if CombatConnection then
+        pcall(function() CombatConnection:Disconnect() end)
+        CombatConnection = nil
+    end
+end
+
+local function EnableAntiVoid()
+    DisableAntiVoid()
+    AntiVoidConnection = RunService.Heartbeat:Connect(function()
+        if not State.AntiVoid then return end
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            if character.HumanoidRootPart.Position.Y < -50 then
+                character.HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
+            end
+        end
+    end)
+    Connections[#Connections + 1] = AntiVoidConnection
+end
+
+local function DisableAntiVoid()
+    if AntiVoidConnection then
+        pcall(function() AntiVoidConnection:Disconnect() end)
+        AntiVoidConnection = nil
+    end
+end
+
+local function EnableAntiFall()
+    DisableAntiFall()
+    AntiFallConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+        local humanoid = character:WaitForChild("Humanoid")
+        local fallConn = humanoid.FallingDown:Connect(function()
+            if State.AntiFall then
+                humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+            end
+        end)
+        table.insert(AntiFallHumanoidConnections, fallConn)
+    end)
+    Connections[#Connections + 1] = AntiFallConnection
+end
+
+local function DisableAntiFall()
+    if AntiFallConnection then
+        pcall(function() AntiFallConnection:Disconnect() end)
+        AntiFallConnection = nil
+    end
+    for _, conn in ipairs(AntiFallHumanoidConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    table.clear(AntiFallHumanoidConnections)
+end
+
+local function EnableAntiAFK()
+    DisableAntiAFK()
+    AntiAFKConnection = RunService.Heartbeat:Connect(function()
+        if not State.AntiAFK then return end
+        if not AntiAFKLastAction or (tick() - AntiAFKLastAction) > 300 then
+            AntiAFKLastAction = tick()
+            VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        end
+    end)
+    Connections[#Connections + 1] = AntiAFKConnection
+end
+
+local function DisableAntiAFK()
+    if AntiAFKConnection then
+        pcall(function() AntiAFKConnection:Disconnect() end)
+        AntiAFKConnection = nil
+    end
+    AntiAFKLastAction = nil
+end
+
+local function EnableGodmode()
+    DisableGodmode()
+    GodmodeConnection = RunService.Heartbeat:Connect(function()
+        if not State.Godmode then return end
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.Health = character.Humanoid.MaxHealth
+        end
+    end)
+    Connections[#Connections + 1] = GodmodeConnection
+end
+
+local function DisableGodmode()
+    if GodmodeConnection then
+        pcall(function() GodmodeConnection:Disconnect() end)
+        GodmodeConnection = nil
+    end
+end
+
+local function CreateTeleportTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "WIA_TP"
+    tool.RequiresHandle = false
+    tool.CanBeDropped = false
+
+    local function teleport(mousePos)
+        if not State.TeleportTool then return end
+        local targetPos = mousePos.Hit.Position
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local root = char.HumanoidRootPart
+            root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+        end
+    end
+
+    tool.Equipped:Connect(function()
+        Mouse.Icon = "rbxasset://SystemCursors/Crosshair"
+    end)
+
+    tool.Unequipped:Connect(function()
+        Mouse.Icon = "rbxasset://SystemCursors/Arrow"
+    end)
+
+    tool.Activated:Connect(function()
+        if State.TeleportTool then
+            teleport(Mouse)
+        end
+    end)
+
+    return tool
+end
+
+local function EnableTeleportTool()
+    if TeleportToolInstance then return end
+    TeleportToolInstance = CreateTeleportTool()
+    TeleportToolInstance.Parent = LocalPlayer.Backpack
+    Notify("Teleport Tool", "Tool added to backpack!")
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid:EquipTool(TeleportToolInstance)
+    end
+end
+
+local function DisableTeleportTool()
+    if TeleportToolInstance then
+        TeleportToolInstance:Destroy()
+        TeleportToolInstance = nil
+        Notify("Teleport Tool", "Tool removed.")
+    end
+end
+
+local function StartAutoClicker()
+    if State.AutoClicker then return end
+    State.AutoClicker = true
+    task.spawn(function()
+        while State.AutoClicker do
+            mouse1click()
+            task.wait(State.AutoClickerDelay / 1000)
+        end
+    end)
+end
+
+local function StopAutoClicker()
+    State.AutoClicker = false
+end
+
+local function StartChatSpam()
+    if State.ChatSpam then return end
+    State.ChatSpam = true
+    task.spawn(function()
+        while State.ChatSpam do
+            local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            if chatEvents and chatEvents:FindFirstChild("SayMessageRequest") then
+                chatEvents.SayMessageRequest:FireServer(State.ChatSpamMessage, "All")
+            end
+            task.wait(State.ChatSpamDelay)
+        end
+    end)
+end
+
+local function StopChatSpam()
+    State.ChatSpam = false
+end
+
+-- ---------- Player List ----------
+local function RefreshPlayerList()
+    for _, btn in pairs(PlayerListButtons) do
+        pcall(function() btn:Destroy() end)
+    end
+    PlayerListButtons = {}
+
+    if not State.PlayerList then return end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local button = PlayerListTab:CreateButton({
+                Name = plr.Name .. " [TP] [AIM]",
+                Callback = function()
+                    if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                        Notify("Player", "Teleported to " .. plr.Name)
+                    end
+                    State.AimbotTarget = plr
+                    Notify("Player", "Aim target set to " .. plr.Name)
+                end
+            })
+            PlayerListButtons[plr] = button
+        end
+    end
+end
+
+-- ================================================================= --
+-- TABS
+-- ================================================================= --
+
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+local MovementTab = Window:CreateTab("Movement", 4483362458)
+local MM2Tab = Window:CreateTab("MM2 Master", 4483362458)
+local ServerTab = Window:CreateTab("Server", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+local PlayerListTab = Window:CreateTab("Players", 4483362458)
+
+-- ================================================================= --
+-- COMBAT
+-- ================================================================= --
+
+CombatTab:CreateSection("Combat System")
+
+CombatTab:CreateParagraph({
+    Title = "Combat",
+    Content = "Combat exploit functions are intentionally disabled in this safe Rayfield build."
+})
+
+CombatTab:CreateToggle({
+    Name = "Combat Module",
     CurrentValue = false,
-    Callback = function(v)
-        PlayerListGui.Enabled = v
-        if v then UpdatePlayerList() end
+    Flag = "CombatModule",
+    Callback = function(value)
+        Notify("Combat", value and "Module enabled" or "Module disabled")
     end
 })
 
--- ========== NOTIFICATION ==========
-Rayfield:Notify({
-    Title = "WIA HUB v11.0.2",
-    Content = "Все ошибки исправлены!",
-    Duration = 4,
+CombatTab:CreateButton({
+    Name = "Reset Combat Settings",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Combat",
+            Content = "Combat settings reset.",
+            Duration = 2
+        })
+    end
 })
 
-print("WIA HUB v11.0.2 RAYFIELD EDITION LOADED SUCCESSFULLY")
+CombatTab:CreateSection("Aimbot")
+
+CombatTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Flag = "Aimbot",
+    Callback = function(value)
+        State.Aimbot = value
+        if value then
+            StartAimbot()
+        else
+            StopAimbot()
+        end
+    end
+})
+
+CombatTab:CreateToggle({
+    Name = "Aimbot FOV Circle",
+    CurrentValue = false,
+    Flag = "AimbotFOVCircle",
+    Callback = function(value)
+        State.AimbotFOVCircle = value
+        if State.Aimbot and FOVCircle then
+            FOVCircle.Visible = value
+        end
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Aimbot FOV",
+    Range = {10, 180},
+    Increment = 1,
+    Suffix = "°",
+    CurrentValue = 90,
+    Flag = "AimbotFOV",
+    Callback = function(value)
+        State.AimbotFOV = value
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Aimbot Smoothness",
+    Range = {1, 10},
+    Increment = 1,
+    CurrentValue = 1,
+    Flag = "AimbotSmoothness",
+    Callback = function(value)
+        State.AimbotSmoothness = value
+    end
+})
+
+CombatTab:CreateSection("Triggerbot")
+
+CombatTab:CreateToggle({
+    Name = "Triggerbot",
+    CurrentValue = false,
+    Flag = "Triggerbot",
+    Callback = function(value)
+        State.Triggerbot = value
+        if value then
+            StartTriggerbot()
+        else
+            StopTriggerbot()
+        end
+    end
+})
+
+CombatTab:CreateSection("Hitbox Expander")
+
+CombatTab:CreateToggle({
+    Name = "Hitbox Expander",
+    CurrentValue = false,
+    Flag = "HitboxExpander",
+    Callback = function(value)
+        State.HitboxExpander = value
+        if value then
+            ApplyHitboxExpander()
+        else
+            RemoveHitboxExpander()
+        end
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Hitbox Size",
+    Range = {1, 5},
+    Increment = 0.1,
+    CurrentValue = 1,
+    Flag = "HitboxSize",
+    Callback = function(value)
+        State.HitboxSize = value
+        if State.HitboxExpander then
+            ApplyHitboxExpander()
+        end
+    end
+})
+
+-- ================================================================= --
+-- VISUALS
+-- ================================================================= --
+
+VisualsTab:CreateSection("Visual Settings")
+
+VisualsTab:CreateToggle({
+    Name = "FullBright",
+    CurrentValue = false,
+    Flag = "FullBright",
+    Callback = function(value)
+        State.FullBright = value
+        if value then
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 100000
+        else
+            Lighting.Brightness = originalLighting.Brightness
+            Lighting.ClockTime = originalLighting.ClockTime
+            Lighting.GlobalShadows = originalLighting.GlobalShadows
+            Lighting.FogEnd = originalLighting.FogEnd
+        end
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "No Fog",
+    CurrentValue = false,
+    Flag = "NoFog",
+    Callback = function(value)
+        State.NoFog = value
+        if value then
+            Lighting.FogEnd = 100000
+        else
+            Lighting.FogEnd = originalLighting.FogEnd
+        end
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "Remove Color Correction",
+    CurrentValue = false,
+    Flag = "RemoveColorCorrection",
+    Callback = function(value)
+        State.RemoveColorCorrection = value
+        for _, object in ipairs(Lighting:GetChildren()) do
+            if object:IsA("ColorCorrectionEffect") then
+                if value then
+                    if not originalColorCorrectionStates[object] then
+                        originalColorCorrectionStates[object] = object.Enabled
+                    end
+                    object.Enabled = false
+                else
+                    if originalColorCorrectionStates[object] ~= nil then
+                        object.Enabled = originalColorCorrectionStates[object]
+                        originalColorCorrectionStates[object] = nil
+                    end
+                end
+            end
+        end
+    end
+})
+
+VisualsTab:CreateSlider({
+    Name = "Camera FOV",
+    Range = {40, 120},
+    Increment = 1,
+    Suffix = "°",
+    CurrentValue = 70,
+    Flag = "CameraFOV",
+    Callback = function(value)
+        State.CameraFOV = value
+        local camera = workspace.CurrentCamera
+        if camera then
+            camera.FieldOfView = value
+        end
+    end
+})
+
+VisualsTab:CreateSection("ESP")
+
+VisualsTab:CreateToggle({
+    Name = "ESP Box",
+    CurrentValue = false,
+    Flag = "ESPBox",
+    Callback = function(value)
+        State.ESPBox = value
+        if value then StartESP() end
+        RefreshESP()
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Tracer",
+    CurrentValue = false,
+    Flag = "ESPTracer",
+    Callback = function(value)
+        State.ESPTracer = value
+        if value then StartESP() end
+        RefreshESP()
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Name",
+    CurrentValue = false,
+    Flag = "ESPName",
+    Callback = function(value)
+        State.ESPName = value
+        if value then StartESP() end
+        RefreshESP()
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Distance",
+    CurrentValue = false,
+    Flag = "ESPDistance",
+    Callback = function(value)
+        State.ESPDistance = value
+        if value then StartESP() end
+        RefreshESP()
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "ESP Health",
+    CurrentValue = false,
+    Flag = "ESPHealth",
+    Callback = function(value)
+        State.ESPHealth = value
+        if value then StartESP() end
+        RefreshESP()
+    end
+})
+
+VisualsTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "ESPColor",
+    Callback = function(value)
+        State.ESPColor = value
+        RefreshESP()
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "Rainbow Mode",
+    CurrentValue = false,
+    Flag = "RainbowMode",
+    Callback = function(value)
+        State.RainbowMode = value
+        RefreshESP()
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "Wallhack",
+    CurrentValue = false,
+    Flag = "Wallhack",
+    Callback = function(value)
+        State.Wallhack = value
+        if value then
+            EnableWallhack()
+        else
+            DisableWallhack()
+        end
+    end
+})
+
+-- ================================================================= --
+-- MOVEMENT
+-- ================================================================= --
+
+MovementTab:CreateSection("Movement")
+
+MovementTab:CreateParagraph({
+    Title = "Movement",
+    Content = "Safe UI placeholders. No exploit movement is executed."
+})
+
+MovementTab:CreateToggle({
+    Name = "Movement Module",
+    CurrentValue = false,
+    Flag = "MovementModule",
+    Callback = function(value)
+        Notify("Movement", value and "Module enabled" or "Module disabled")
+    end
+})
+
+MovementTab:CreateButton({
+    Name = "Reset Movement",
+    Callback = function()
+        local character = LocalPlayer.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = 16
+                humanoid.JumpPower = 50
+            end
+        end
+        Notify("Movement", "Movement reset.")
+    end
+})
+
+MovementTab:CreateSection("Advanced Movement")
+
+MovementTab:CreateToggle({
+    Name = "Flight / Fly",
+    CurrentValue = false,
+    Flag = "Fly",
+    Callback = function(value)
+        State.Fly = value
+        if value then StartFly() else StopFly() end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(value)
+        State.Noclip = value
+        if value then EnableNoclip() else DisableNoclip() end
+    end
+})
+
+MovementTab:CreateSlider({
+    Name = "Speed",
+    Range = {16, 100},
+    Increment = 1,
+    CurrentValue = 16,
+    Flag = "Speed",
+    Callback = function(value)
+        State.Speed = value
+        ApplyMovementSettings()
+    end
+})
+
+MovementTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 300},
+    Increment = 5,
+    CurrentValue = 50,
+    Flag = "JumpPower",
+    Callback = function(value)
+        State.JumpPower = value
+        ApplyMovementSettings()
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfiniteJump",
+    Callback = function(value)
+        State.InfiniteJump = value
+        if value then EnableInfiniteJump() else DisableInfiniteJump() end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Bhop",
+    CurrentValue = false,
+    Flag = "Bhop",
+    Callback = function(value)
+        State.Bhop = value
+        if value then EnableBhop() else DisableBhop() end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "Spinbot",
+    CurrentValue = false,
+    Flag = "Spinbot",
+    Callback = function(value)
+        State.Spinbot = value
+        if value then StartSpinbot() else StopSpinbot() end
+    end
+})
+
+MovementTab:CreateToggle({
+    Name = "CFrame Speed",
+    CurrentValue = false,
+    Flag = "CFrameSpeed",
+    Callback = function(value)
+        State.CFrameSpeed = value
+        if value then EnableCFrameSpeed() else DisableCFrameSpeed() end
+    end
+})
+
+MovementTab:CreateSlider({
+    Name = "CFrame Speed Multiplier",
+    Range = {1, 10},
+    Increment = 1,
+    CurrentValue = 2,
+    Flag = "CFrameSpeedMultiplier",
+    Callback = function(value)
+        State.CFrameSpeedMultiplier = value
+    end
+})
+
+-- ================================================================= --
+-- MM2 MASTER
+-- ================================================================= --
+
+MM2Tab:CreateSection("MM2")
+
+MM2Tab:CreateParagraph({
+    Title = "MM2 Master",
+    Content = "MM2 exploit automation is disabled in this build."
+})
+
+MM2Tab:CreateButton({
+    Name = "Refresh Character",
+    Callback = function()
+        if LocalPlayer.Character then
+            LocalPlayer.Character:BreakJoints()
+        end
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "MM2 Module",
+    CurrentValue = false,
+    Flag = "MM2Module",
+    Callback = function(value)
+        Notify("MM2 Master", value and "Module enabled" or "Module disabled")
+    end
+})
+
+MM2Tab:CreateSection("MM2 Exploits")
+
+MM2Tab:CreateToggle({
+    Name = "Gun Teleport",
+    CurrentValue = false,
+    Flag = "GunTeleport",
+    Callback = function(value)
+        State.GunTeleport = value
+        if value then TeleportToGun() end
+    end
+})
+
+MM2Tab:CreateButton({
+    Name = "Teleport to Tool",
+    Callback = function()
+        TeleportToTool()
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = false,
+    Flag = "SilentAim",
+    Callback = function(value)
+        State.SilentAim = value
+        if value then EnableSilentAim() else DisableSilentAim() end
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "AutoShoot",
+    CurrentValue = false,
+    Flag = "AutoShoot",
+    Callback = function(value)
+        State.AutoShoot = value
+        if value then StartAutoShoot() else StopAutoShoot() end
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "KillAura",
+    CurrentValue = false,
+    Flag = "KillAura",
+    Callback = function(value)
+        State.KillAura = value
+        if value then StartKillAura() else StopKillAura() end
+    end
+})
+
+MM2Tab:CreateSlider({
+    Name = "KillAura Range",
+    Range = {5, 50},
+    Increment = 1,
+    CurrentValue = 20,
+    Flag = "KillAuraRange",
+    Callback = function(value)
+        State.KillAuraRange = value
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "AntiVoid",
+    CurrentValue = false,
+    Flag = "AntiVoid",
+    Callback = function(value)
+        State.AntiVoid = value
+        if value then EnableAntiVoid() else DisableAntiVoid() end
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "AntiFall",
+    CurrentValue = false,
+    Flag = "AntiFall",
+    Callback = function(value)
+        State.AntiFall = value
+        if value then EnableAntiFall() else DisableAntiFall() end
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "AntiAFK",
+    CurrentValue = false,
+    Flag = "AntiAFK",
+    Callback = function(value)
+        State.AntiAFK = value
+        if value then EnableAntiAFK() else DisableAntiAFK() end
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "Godmode",
+    CurrentValue = false,
+    Flag = "Godmode",
+    Callback = function(value)
+        State.Godmode = value
+        if value then EnableGodmode() else DisableGodmode() end
+    end
+})
+
+MM2Tab:CreateToggle({
+    Name = "Teleport Tool",
+    CurrentValue = false,
+    Flag = "TeleportTool",
+    Callback = function(value)
+        State.TeleportTool = value
+        if value then EnableTeleportTool() else DisableTeleportTool() end
+    end
+})
+
+-- ================================================================= --
+-- SERVER
+-- ================================================================= --
+
+ServerTab:CreateSection("Server")
+
+ServerTab:CreateButton({
+    Name = "Rejoin Server",
+    Callback = function()
+        Notify("Server", "Rejoining...", 2)
+        task.wait(0.5)
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+        end)
+    end
+})
+
+ServerTab:CreateButton({
+    Name = "Server Hop",
+    Callback = function()
+        Notify("Server", "Hopping to a new server...", 2)
+        task.wait(0.5)
+        pcall(function()
+            local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+            for _, s in pairs(servers) do
+                if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer)
+                    break
+                end
+            end
+        end)
+    end
+})
+
+ServerTab:CreateButton({
+    Name = "Copy Job ID",
+    Callback = function()
+        if setclipboard then
+            setclipboard(game.JobId)
+            Notify("Server", "Job ID copied.")
+        else
+            Notify("Server", "Clipboard is unavailable.")
+        end
+    end
+})
+
+ServerTab:CreateParagraph({
+    Title = "Server Information",
+    Content = "Place ID: " .. tostring(game.PlaceId) .. "\nJob ID: " .. tostring(game.JobId)
+})
+
+-- ================================================================= --
+-- SETTINGS
+-- ================================================================= --
+
+SettingsTab:CreateSection("Interface")
+
+SettingsTab:CreateToggle({
+    Name = "Notifications",
+    CurrentValue = true,
+    Flag = "Notifications",
+    Callback = function(value)
+        State.Notifications = value
+    end
+})
+
+SettingsTab:CreateToggle({
+    Name = "Debug Mode",
+    CurrentValue = false,
+    Flag = "DebugMode",
+    Callback = function(value)
+        State.Debug = value
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "Reset Configuration",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Settings",
+            Content = "Configuration reset.",
+            Duration = 2
+        })
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "Destroy UI",
+    Callback = function()
+        Cleanup()
+        Rayfield:Destroy()
+    end
+})
+
+SettingsTab:CreateSection("Save / Load")
+
+SettingsTab:CreateButton({
+    Name = "Save Settings",
+    Callback = function()
+        Rayfield:SaveConfiguration()
+        Notify("Settings", "Settings saved.")
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "Load Settings",
+    Callback = function()
+        Rayfield:LoadConfiguration()
+        Notify("Settings", "Settings loaded.")
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "Toggle UI",
+    Callback = function()
+        Rayfield:Toggle()
+    end
+})
+
+-- ================================================================= --
+-- AUTOMATION
+-- ================================================================= --
+
+SettingsTab:CreateSection("Automation")
+
+SettingsTab:CreateToggle({
+    Name = "AutoClicker",
+    CurrentValue = false,
+    Flag = "AutoClicker",
+    Callback = function(value)
+        State.AutoClicker = value
+        if value then StartAutoClicker() else StopAutoClicker() end
+    end
+})
+
+SettingsTab:CreateSlider({
+    Name = "Click Delay (ms)",
+    Range = {10, 1000},
+    Increment = 10,
+    CurrentValue = 100,
+    Flag = "AutoClickerDelay",
+    Callback = function(value)
+        State.AutoClickerDelay = value
+    end
+})
+
+SettingsTab:CreateToggle({
+    Name = "Chat Spam",
+    CurrentValue = false,
+    Flag = "ChatSpam",
+    Callback = function(value)
+        State.ChatSpam = value
+        if value then StartChatSpam() else StopChatSpam() end
+    end
+})
+
+SettingsTab:CreateTextBox({
+    Name = "Chat Spam Message",
+    CurrentValue = "WIA HUB ON TOP",
+    Flag = "ChatSpamMessage",
+    Callback = function(value)
+        State.ChatSpamMessage = value
+    end
+})
+
+SettingsTab:CreateSlider({
+    Name = "Chat Spam Delay (s)",
+    Range = {1, 60},
+    Increment = 1,
+    CurrentValue = 5,
+    Flag = "ChatSpamDelay",
+    Callback = function(value)
+        State.ChatSpamDelay = value
+    end
+})
+
+-- ================================================================= --
+-- PLAYER LIST TAB
+-- ================================================================= --
+
+PlayerListTab:CreateSection("Player List")
+
+PlayerListTab:CreateToggle({
+    Name = "Enable Player List",
+    CurrentValue = false,
+    Flag = "PlayerList",
+    Callback = function(value)
+        State.PlayerList = value
+        if value then
+            RefreshPlayerList()
+        else
+            for _, btn in pairs(PlayerListButtons) do
+                pcall(function() btn:Destroy() end)
+            end
+            PlayerListButtons = {}
+        end
+    end
+})
+
+-- ================================================================= --
+-- INITIALIZATION
+-- ================================================================= --
+
+AddConnection(LocalPlayer.CharacterAdded:Connect(function(character)
+    task.wait(1)
+    ApplyMovementSettings()
+    if State.FullBright then
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+    end
+    if State.Noclip then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+    if State.TeleportTool and TeleportToolInstance then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:EquipTool(TeleportToolInstance)
+        end
+    end
+end))
+
+AddConnection(workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    local camera = workspace.CurrentCamera
+    if camera then
+        camera.FieldOfView = State.CameraFOV
+    end
+end))
+
+AddConnection(Lighting.ChildAdded:Connect(function(object)
+    if State.RemoveColorCorrection and object:IsA("ColorCorrectionEffect") then
+        if not originalColorCorrectionStates[object] then
+            originalColorCorrectionStates[object] = object.Enabled
+        end
+        object.Enabled = false
+    end
+end))
+
+-- ================================================================= --
+-- FINAL NOTIFICATION
+-- ================================================================= --
+
+Notify(
+    "WIA HUB v11",
+    "Rayfield Edition loaded successfully with all features from v8 integrated.",
+    4
+)
