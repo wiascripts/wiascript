@@ -1,6 +1,6 @@
 -- ================================================================= --
--- WIA HUB v9.5 Ultimate Edition :: whitewia / tordark (Rayfield GUI)
--- FIXED: Hitboxes, Wallhack Toggle, ESP Text, JumpPower, Aimbot Selector
+-- WIA HUB v9.6 MM2 & Profile Edition :: whitewia / tordark
+-- FIXED: ESP Box/Skeleton Toggle Fix, Startup Off, Profile, MM2 Hub
 -- ================================================================= --
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
+local Stats = game:GetService("Stats")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -55,7 +56,7 @@ local spectateTarget = nil
 local aimbotFOV = 90
 local aimbotSmoothness = 5
 local aimbotSelectedTarget = nil
-local fovCircleVisible = true
+local fovCircleVisible = false
 local aimbotEnabled = false
 
 -- Hitbox & Misc Utilities
@@ -68,14 +69,26 @@ local triggerbotEnabled = false
 local chatSpamEnabled, chatSpamMessage, chatSpamDelay = false, "WIA HUB ON TOP", 5
 local antiFallEnabled = false
 
--- ESP Extras
-local espBoxEnabled = true
-local espTracerEnabled = true
-local espNamesEnabled = true
-local espDistanceEnabled = true
-local espHealthEnabled = true
-local skeletonEspEnabled = true
+-- ESP Extras (ALL DISABLED BY DEFAULT)
+local espBoxEnabled = false
+local espTracerEnabled = false
+local espNamesEnabled = false
+local espDistanceEnabled = false
+local espHealthEnabled = false
+local skeletonEspEnabled = false
 local espLines, tracerLines, textDrawings, skeletonLines = {}, {}, {}, {}
+
+-- MM2 Variables
+local mm2EspEnabled = false
+local mm2AutoAimMurderer = false
+local mm2SilentAim = false
+local killAuraEnabled = false
+local killAuraRange = 15
+
+-- Stats & Profile Variables
+local fpsCount = 0
+local frameCounter = 0
+local lastFpsUpdate = tick()
 
 -- Drawing API FOV Circle
 local fovCircle = nil
@@ -89,24 +102,126 @@ if Drawing then
     fovCircle.Color = Color3.fromRGB(180, 0, 255)
 end
 
+-- ========== HELPER FUNCTIONS ==========
+local function getMM2Role(plr)
+    if not plr then return "Innocent" end
+    local char = plr.Character
+    local backpack = plr:FindFirstChild("Backpack")
+
+    local hasKnife = (char and char:FindFirstChild("Knife")) or (backpack and backpack:FindFirstChild("Knife"))
+    local hasGun = (char and (char:FindFirstChild("Gun") or char:FindFirstChild("Revolver"))) or (backpack and (backpack:FindFirstChild("Gun") or backpack:FindFirstChild("Revolver")))
+
+    if hasKnife then return "Murderer" end
+    if hasGun then return "Sheriff" end
+    return "Innocent"
+end
+
 -- ========== RAYFIELD WINDOW SETUP ==========
 local Window = Rayfield:CreateWindow({
-    Name = "WIA HUB v9.5 Ultimate Edition",
-    LoadingTitle = "WIA HUB v9.5 Loading...",
+    Name = "WIA HUB v9.6 MM2 Edition",
+    LoadingTitle = "WIA HUB Loading...",
     LoadingSubtitle = "by whitewia / tordark",
     ConfigurationSaving = { Enabled = false },
     Discord = { Enabled = false },
     KeySystem = false
 })
 
+local ProfileTab = Window:CreateTab("Profile & Info", 4483362458)
+local MM2Tab = Window:CreateTab("Murder Mystery 2", 4483362458)
 local CombatTab = Window:CreateTab("Combat & Aim", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals & ESP", 4483345998)
 local MovementTab = Window:CreateTab("Movement & Cam", 4483345998)
 local MiscTab = Window:CreateTab("Misc & Utilities", 4483362458)
 
+-- ========== PROFILE TAB ==========
+ProfileTab:CreateSection("Информация об Игроке")
+ProfileTab:CreateLabel("Ник: " .. LocalPlayer.Name .. " (" .. LocalPlayer.DisplayName .. ")")
+ProfileTab:CreateLabel("User ID: " .. LocalPlayer.UserId)
+
+local FpsLabel = ProfileTab:CreateLabel("FPS: Вычисляется...")
+local PingLabel = ProfileTab:CreateLabel("Ping: Вычисляется...")
+
+RunService.RenderStepped:Connect(function()
+    frameCounter = frameCounter + 1
+    local now = tick()
+    if now - lastFpsUpdate >= 1 then
+        fpsCount = frameCounter
+        frameCounter = 0
+        lastFpsUpdate = now
+        
+        local ping = 0
+        pcall(function()
+            ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+        
+        FpsLabel:Set("FPS: " .. fpsCount)
+        PingLabel:Set("Ping: " .. ping .. " ms")
+    end
+end)
+
+-- ========== MM2 TAB ==========
+MM2Tab:CreateSection("ESP & Детектор Ролей")
+MM2Tab:CreateToggle({
+    Name = "MM2 Role ESP (Мардер / Шериф / Инносент)",
+    CurrentValue = false,
+    Callback = function(v)
+        mm2EspEnabled = v
+        if not v then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr.Character then
+                    local hl = plr.Character:FindFirstChild("WIA_MM2_ESP")
+                    if hl then hl:Destroy() end
+                end
+            end
+        end
+    end
+})
+
+MM2Tab:CreateSection("Аимбот & Бой MM2")
+MM2Tab:CreateToggle({
+    Name = "Auto Aim на Мардера",
+    CurrentValue = false,
+    Callback = function(v) mm2AutoAimMurderer = v end
+})
+
+MM2Tab:CreateToggle({
+    Name = "Silent Aim (Авто-наведение)",
+    CurrentValue = false,
+    Callback = function(v) mm2SilentAim = v end
+})
+
+MM2Tab:CreateToggle({
+    Name = "Kill Aura (Авто-атака)",
+    CurrentValue = false,
+    Callback = function(v) killAuraEnabled = v end
+})
+
+MM2Tab:CreateSlider({
+    Name = "Дистанция Kill Aura",
+    Range = {5, 30},
+    Increment = 1,
+    CurrentValue = 15,
+    Callback = function(v) killAuraRange = v end
+})
+
+MM2Tab:CreateSection("Телепортация")
+MM2Tab:CreateButton({
+    Name = "Телепорт к выбитому Пистолету",
+    Callback = function()
+        local gunDrop = Workspace:FindFirstChild("GunDrop", true) or Workspace:FindFirstChild("Gun", true)
+        if gunDrop and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = gunDrop:IsA("BasePart") and gunDrop.CFrame or gunDrop:GetPivot()
+            LocalPlayer.Character.HumanoidRootPart.CFrame = targetPos + Vector3.new(0, 3, 0)
+            Rayfield:Notify({Title = "MM2", Content = "Успешно телепортирован к пистолету!", Duration = 3})
+        else
+            Rayfield:Notify({Title = "MM2", Content = "Выпавший пистолет не найден!", Duration = 3})
+        end
+    end
+})
+
 -- ========== PLAYER LIST & CONTROLS UI ==========
 local PlayerListGui = Instance.new("ScreenGui")
-PlayerListGui.Name = "WiaPlayerList_v95"
+PlayerListGui.Name = "WiaPlayerList_v96"
 PlayerListGui.Parent = CoreGui
 PlayerListGui.Enabled = false
 
@@ -234,7 +349,6 @@ local function updatePlayerList()
             specBtn.TextSize = 10
             specBtn.Parent = row
 
-            -- Button actions
             tpBtn.MouseButton1Click:Connect(function()
                 if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
@@ -329,7 +443,7 @@ end)
 
 -- ========== COMBAT TAB ==========
 CombatTab:CreateToggle({ Name = "Aimbot", CurrentValue = false, Callback = function(v) aimbotEnabled = v end })
-CombatTab:CreateToggle({ Name = "Aimbot FOV Circle", CurrentValue = true, Callback = function(v) fovCircleVisible = v end })
+CombatTab:CreateToggle({ Name = "Aimbot FOV Circle", CurrentValue = false, Callback = function(v) fovCircleVisible = v end })
 CombatTab:CreateSlider({ Name = "Aimbot FOV", Range = {10, 400}, Increment = 5, CurrentValue = 90, Callback = function(v) aimbotFOV = v end })
 CombatTab:CreateSlider({ Name = "Aimbot Smoothness", Range = {1, 20}, Increment = 1, CurrentValue = 5, Callback = function(v) aimbotSmoothness = v end })
 CombatTab:CreateToggle({ Name = "Triggerbot (AutoShot)", CurrentValue = false, Callback = function(v) triggerbotEnabled = v end })
@@ -347,15 +461,15 @@ CombatTab:CreateToggle({ Name = "Hitbox Expander", CurrentValue = false, Callbac
 end })
 CombatTab:CreateSlider({ Name = "Hitbox Size", Range = {2, 20}, Increment = 1, CurrentValue = 5, Callback = function(v) hitboxSize = v end })
 
--- ========== VISUALS TAB ==========
-VisualsTab:CreateToggle({ Name = "ESP Boxes", CurrentValue = true, Callback = function(v) espBoxEnabled = v end })
-VisualsTab:CreateToggle({ Name = "ESP Tracers", CurrentValue = true, Callback = function(v) espTracerEnabled = v end })
-VisualsTab:CreateToggle({ Name = "ESP Names", CurrentValue = true, Callback = function(v) espNamesEnabled = v end })
-VisualsTab:CreateToggle({ Name = "ESP Distance & HP", CurrentValue = true, Callback = function(v)
+-- ========== VISUALS TAB (ALL DISABLED ON STARTUP) ==========
+VisualsTab:CreateToggle({ Name = "ESP Boxes", CurrentValue = false, Callback = function(v) espBoxEnabled = v end })
+VisualsTab:CreateToggle({ Name = "ESP Tracers", CurrentValue = false, Callback = function(v) espTracerEnabled = v end })
+VisualsTab:CreateToggle({ Name = "ESP Names", CurrentValue = false, Callback = function(v) espNamesEnabled = v end })
+VisualsTab:CreateToggle({ Name = "ESP Distance & HP", CurrentValue = false, Callback = function(v)
     espDistanceEnabled = v
     espHealthEnabled = v
 end })
-VisualsTab:CreateToggle({ Name = "Skeleton ESP", CurrentValue = true, Callback = function(v) skeletonEspEnabled = v end })
+VisualsTab:CreateToggle({ Name = "Skeleton ESP", CurrentValue = false, Callback = function(v) skeletonEspEnabled = v end })
 VisualsTab:CreateToggle({ Name = "Wallhack (Highlight)", CurrentValue = false, Callback = function(v)
     wallhackEnabled = v
     if not v then
@@ -477,7 +591,7 @@ MiscTab:CreateButton({ Name = "Server Hop", Callback = function()
     end
 end })
 
--- ========== ENHANCED SYSTEMS & LOOPS ==========
+-- ========== LOOPS & SYSTEM UPDATES ==========
 
 -- Noclip loop
 RunService.Stepped:Connect(function()
@@ -554,6 +668,7 @@ local function getAimbotTarget()
     return closest
 end
 
+-- MM2 Auto Aim & General Aimbot Loop
 RunService.RenderStepped:Connect(function()
     if fovCircle then
         fovCircle.Position = Vector2.new(Mouse.X, Mouse.Y + 36)
@@ -561,13 +676,54 @@ RunService.RenderStepped:Connect(function()
         fovCircle.Visible = aimbotEnabled and fovCircleVisible
     end
 
-    if aimbotEnabled then
+    if mm2AutoAimMurderer then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and getMM2Role(plr) == "Murderer" and plr.Character and plr.Character:FindFirstChild("Head") then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, plr.Character.Head.Position)
+                break
+            end
+        end
+    elseif aimbotEnabled then
         local target = getAimbotTarget()
         if target and target.Character and target.Character:FindFirstChild("Head") then
             local targetPos = target.Character.Head.Position
             local currentCFrame = Camera.CFrame
             local newCFrame = CFrame.new(currentCFrame.Position, targetPos)
             Camera.CFrame = currentCFrame:Lerp(newCFrame, 1 / aimbotSmoothness)
+        end
+    end
+end)
+
+-- MM2 Silent Aim
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if mm2SilentAim and tostring(method) == "FindPartOnRayWithIgnoreList" then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and getMM2Role(plr) == "Murderer" and plr.Character and plr.Character:FindFirstChild("Head") then
+                return plr.Character.Head, plr.Character.Head.Position
+            end
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+
+-- MM2 Kill Aura
+RunService.Heartbeat:Connect(function()
+    if killAuraEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+        local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") then
+                    if plr.Character.Humanoid.Health > 0 then
+                        local dist = (plr.Character.HumanoidRootPart.Position - myPos).Magnitude
+                        if dist <= killAuraRange then
+                            tool:Activate()
+                        end
+                    end
+                end
+            end
         end
     end
 end)
@@ -580,6 +736,33 @@ RunService.RenderStepped:Connect(function()
             local plr = Players:GetPlayerFromCharacter(target.Parent)
             if plr and plr ~= LocalPlayer then
                 mouse1click()
+            end
+        end
+    end
+end)
+
+-- MM2 Highlight Loop
+RunService.Heartbeat:Connect(function()
+    if mm2EspEnabled then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                local role = getMM2Role(plr)
+                local hl = plr.Character:FindFirstChild("WIA_MM2_ESP")
+                if not hl then
+                    hl = Instance.new("Highlight")
+                    hl.Name = "WIA_MM2_ESP"
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = plr.Character
+                end
+                
+                if role == "Murderer" then
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                elseif role == "Sheriff" then
+                    hl.FillColor = Color3.fromRGB(0, 150, 255)
+                else
+                    hl.FillColor = Color3.fromRGB(0, 255, 100)
+                end
+                hl.FillTransparency = 0.4
             end
         end
     end
@@ -695,15 +878,16 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- Advanced ESP & Render Engine
+-- Advanced ESP & Render Engine (CLEANS DYNAMICALLY)
 local PURPLE = Color3.fromRGB(180, 0, 255)
 RunService.RenderStepped:Connect(function()
+    -- ALWAYS CLEAN DRAWINGS EVERY FRAME
     for i = #espLines, 1, -1 do espLines[i]:Remove() espLines[i] = nil end
     for i = #tracerLines, 1, -1 do tracerLines[i]:Remove() tracerLines[i] = nil end
     for i = #textDrawings, 1, -1 do textDrawings[i]:Remove() textDrawings[i] = nil end
     for i = #skeletonLines, 1, -1 do skeletonLines[i]:Remove() skeletonLines[i] = nil end
 
-    if not (espBoxEnabled or espTracerEnabled or espNamesEnabled or skeletonEspEnabled) then return end
+    if not (espBoxEnabled or espTracerEnabled or espNamesEnabled or skeletonEspEnabled or espDistanceEnabled or espHealthEnabled) then return end
 
     local camPos = Camera.CFrame.Position
     local viewport = Camera.ViewportSize
@@ -809,7 +993,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Wallhack Highlight
+-- Wallhack Highlight Loop
 RunService.Heartbeat:Connect(function()
     if wallhackEnabled then
         local targetColor = Color3.fromRGB(180, 0, 255)
@@ -828,8 +1012,8 @@ RunService.Heartbeat:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "WIA HUB v9.5 Ultimate",
-    Content = "All bugs fixed: Hitboxes, Wallhack, JumpPower & Player List updated!",
+    Title = "WIA HUB v9.6 Loaded",
+    Content = "MM2 Hub, Profile Info (FPS/Ping), and ESP fixes active!",
     Duration = 5,
     Image = 4483362458,
 })
