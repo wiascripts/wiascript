@@ -806,28 +806,33 @@ end
 SetupTriggers()
 
 -- ================================================================= --
--- 9. ИНТЕРФЕЙС RAYFIELD (БЕЗОПАСНАЯ ЗАГРУЗКА)
+-- 9. ИНТЕРФЕЙС ORION LIBRARY (СТАБИЛЬНАЯ ЗАГРУЗКА С GITHUB)
 -- ================================================================= --
-local ok, Rayfield = pcall(function()
-    local src = game:HttpGet("https://sirius.menu/rayfield")
-    assert(src and #src > 1000, "Rayfield HTTP response invalid")
-    local fn = loadstring(src)
-    assert(type(fn) == "function", "loadstring failed")
-    return fn()
+local OrionLib = nil
+local success, err = pcall(function()
+    OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
 end)
 
-if not ok or not Rayfield then
-    warn("[WIA] Rayfield failed to load:", Rayfield)
+if not success or not OrionLib then
+    warn("[WIA] Ошибка загрузки Orion Library:", err)
     return
 end
 
-local Window = Rayfield:CreateWindow({
+local Window = OrionLib:MakeWindow({
     Name = "WIA HUB v12.6 | MM2 & IY Hybrid",
-    LoadingTitle = "Загрузка WIA HUB...",
-    LoadingSubtitle = "Финальная версия",
-    ConfigurationSaving = { Enabled = false },
-    KeySystem = false,
+    HidePremium = true,
+    SaveConfig = false,
+    ConfigFolder = "WIAConfig"
 })
+
+-- Вкладки Orion
+local TabMM2 = Window:MakeTab({Name = "MM2 Master", Icon = "rbxassetid://4483362458", PremiumOnly = false})
+local TabMovement = Window:MakeTab({Name = "Movement", Icon = "rbxassetid://4483362458", PremiumOnly = false})
+local TabCombat = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483362458", PremiumOnly = false})
+local TabIYUtils = Window:MakeTab({Name = "IY Utilities", Icon = "rbxassetid://4483362458", PremiumOnly = false})
+
+-- Обязательная инициализация GUI в самом конце скрипта:
+OrionLib:Init()
 
 -- ================================================================= --
 -- ВКЛАДКА: MM2 MASTER
