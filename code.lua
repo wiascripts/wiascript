@@ -805,8 +805,21 @@ end
 
 SetupTriggers()
 
--- ========== 9. ИНТЕРФЕЙС RAYFIELD ==========
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+-- ================================================================= --
+-- 9. ИНТЕРФЕЙС RAYFIELD (БЕЗОПАСНАЯ ЗАГРУЗКА)
+-- ================================================================= --
+local ok, Rayfield = pcall(function()
+    local src = game:HttpGet("https://sirius.menu/rayfield")
+    assert(src and #src > 1000, "Rayfield HTTP response invalid")
+    local fn = loadstring(src)
+    assert(type(fn) == "function", "loadstring failed")
+    return fn()
+end)
+
+if not ok or not Rayfield then
+    warn("[WIA] Rayfield failed to load:", Rayfield)
+    return
+end
 
 local Window = Rayfield:CreateWindow({
     Name = "WIA HUB v12.6 | MM2 & IY Hybrid",
@@ -815,13 +828,6 @@ local Window = Rayfield:CreateWindow({
     ConfigurationSaving = { Enabled = false },
     KeySystem = false,
 })
-
-local Tabs = {
-    MM2 = Window:CreateTab("MM2 Master", 4483362458),
-    Movement = Window:CreateTab("Movement", 4483362458),
-    Combat = Window:CreateTab("Combat", 4483362458),
-    IYUtils = Window:CreateTab("IY Utilities", 4483362458),
-}
 
 -- ================================================================= --
 -- ВКЛАДКА: MM2 MASTER
